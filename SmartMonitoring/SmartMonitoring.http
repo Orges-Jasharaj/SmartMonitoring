@@ -1,6 +1,0 @@
-@SmartMonitoring_HostAddress = http://localhost:5164
-
-GET {{SmartMonitoring_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

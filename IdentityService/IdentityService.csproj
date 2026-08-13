@@ -23,4 +23,8 @@
     <Folder Include="Features\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SmartMonitoring.Shared\SmartMonitoring.Shared.csproj" />
+  </ItemGroup>
+
 </Project>

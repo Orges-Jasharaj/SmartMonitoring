@@ -1,6 +1,7 @@
 using IdentityService.Data;
 using IdentityService.Data.Models;
 using Microsoft.AspNetCore.Identity;
+using SmartMonitoring.Shared.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,6 +28,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Global exception handling
+app.UseExceptionHandling();
 
 app.UseAuthorization();
 

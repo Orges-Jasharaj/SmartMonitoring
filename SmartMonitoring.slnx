@@ -1,4 +1,4 @@
 <Solution>
   <Project Path="IdentityService/IdentityService.csproj" />
-  <Project Path="SmartMonitoring/SmartMonitoring.csproj" />
+  <Project Path="SmartMonitoring.Shared/SmartMonitoring.Shared.csproj" Id="a33d8ec5-b256-4389-a289-11f66163aac5" />
 </Solution>
