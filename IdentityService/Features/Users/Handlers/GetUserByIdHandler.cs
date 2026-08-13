@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace IdentityService.Features.Users.Handlers
 {
-    public class GetUserByIdHandler : IRequestHandler<GetUserByIdQuery, UserDto?>
+    public class GetUserByIdHandler : IRequestHandler<GetUserByIdQuery, SmartMonitoring.Shared.Dtos.Responses.ResponseDto<UserDto?>>
     {
         private readonly UserManager<User> _userManager;
 
@@ -14,20 +14,25 @@ namespace IdentityService.Features.Users.Handlers
             _userManager = userManager;
         }
 
-        public async Task<UserDto?> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
+        public async Task<SmartMonitoring.Shared.Dtos.Responses.ResponseDto<UserDto?>> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
         {
             var u = await _userManager.FindByIdAsync(request.Id);
-            if (u == null) return null;
+            if (u == null) return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<UserDto?>.Failure("User not found");
 
-            return new UserDto
+            var roles = await _userManager.GetRolesAsync(u);
+
+            var dto = new UserDto
             {
                 Id = u.Id,
                 UserName = u.UserName ?? string.Empty,
                 Email = u.Email ?? string.Empty,
                 FirstName = u.FirstName,
                 LastName = u.LastName,
-                IsActive = u.isActive
+                IsActive = u.isActive,
+                Roles = roles
             };
+
+            return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<UserDto?>.SuccessResponse(dto);
         }
     }
 }

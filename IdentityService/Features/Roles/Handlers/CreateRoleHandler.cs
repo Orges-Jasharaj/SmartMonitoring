@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace IdentityService.Features.Roles.Handlers
 {
-    public class CreateRoleHandler : IRequestHandler<CreateRoleCommand, bool>
+    public class CreateRoleHandler : IRequestHandler<CreateRoleCommand, SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>>
     {
         private readonly RoleManager<IdentityRole> _roleManager;
 
@@ -13,11 +13,19 @@ namespace IdentityService.Features.Roles.Handlers
             _roleManager = roleManager;
         }
 
-        public async Task<bool> Handle(CreateRoleCommand request, CancellationToken cancellationToken)
+        public async Task<SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>> Handle(CreateRoleCommand request, CancellationToken cancellationToken)
         {
-            if (await _roleManager.RoleExistsAsync(request.RoleName)) return false;
+            if (await _roleManager.RoleExistsAsync(request.RoleName))
+                return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.Failure("Role already exists");
+
             var result = await _roleManager.CreateAsync(new IdentityRole(request.RoleName));
-            return result.Succeeded;
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => new SmartMonitoring.Shared.Dtos.Responses.ApiError { ErrorCode = e.Code, ErrorMessage = e.Description }).ToList();
+                return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.Failure("Failed to create role", errors);
+            }
+
+            return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.SuccessResponse(true, "Role created");
         }
     }
 }

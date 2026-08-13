@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using SmartMonitoring.Shared.Dtos.Responses;
+using System.Collections.Generic;
 
 namespace SmartMonitoring.Shared.Middleware
 {
@@ -52,9 +54,17 @@ namespace SmartMonitoring.Shared.Middleware
                 Detail = _env.IsDevelopment() ? ex.ToString() : null
             };
 
-            var json = JsonSerializer.Serialize(problem, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            // Map to shared response envelope
+            var errors = new List<ApiError>
+            {
+                new ApiError { ErrorCode = status.ToString(), ErrorMessage = problem.Title }
+            };
 
-            context.Response.ContentType = "application/problem+json";
+            var envelope = new ResponseDto<ProblemDetails>(false, problem.Title, problem, errors);
+
+            var json = JsonSerializer.Serialize(envelope, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+            context.Response.ContentType = "application/json";
             context.Response.StatusCode = status;
             return context.Response.WriteAsync(json);
         }

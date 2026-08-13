@@ -1,8 +1,9 @@
 using MediatR;
+using SmartMonitoring.Shared.Dtos.Responses;
 
 namespace IdentityService.Features.Authentication.Commands
 {
-    public class RegisterCommand : IRequest<RegisterResponse>
+    public class RegisterCommand : IRequest<ResponseDto<RegisterResponse>>
     {
         public string UserName { get; set; } = null!;
         public string Email { get; set; } = null!;

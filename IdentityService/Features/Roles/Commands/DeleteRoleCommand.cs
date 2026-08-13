@@ -3,9 +3,8 @@ using SmartMonitoring.Shared.Dtos.Responses;
 
 namespace IdentityService.Features.Roles.Commands
 {
-    public class AssignRoleCommand : IRequest<ResponseDto<bool>>
+    public class DeleteRoleCommand : IRequest<ResponseDto<bool>>
     {
-        public string UserId { get; set; } = null!;
         public string RoleName { get; set; } = null!;
     }
 }

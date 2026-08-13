@@ -80,12 +80,49 @@ builder.Services.AddAuthorization();
 // JwtService
 builder.Services.AddScoped<IJwtService, JwtService>();
 
+// Use shared response envelope for model validation errors
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .Where(kvp => kvp.Value.Errors.Count > 0)
+            .SelectMany(kvp => kvp.Value.Errors.Select(e => new SmartMonitoring.Shared.Dtos.Responses.ApiError { ErrorMessage = e.ErrorMessage }))
+            .ToList();
+
+        var resp = SmartMonitoring.Shared.Dtos.Responses.ResponseDto<object>.Failure("Validation failed", errors);
+        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(resp);
+    };
+});
+
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddIdentity<User, IdentityRole>()
                 .AddEntityFrameworkStores<IdentityAppDbContext>()
                 .AddDefaultTokenProviders();
+
+// Ensure JWT is used as the default authentication/challenge scheme (AddIdentity may override defaults)
+builder.Services.PostConfigure<Microsoft.AspNetCore.Authentication.AuthenticationOptions>(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+});
+
+// Prevent cookie auth from redirecting to login page for API requests
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Events.OnRedirectToLogin = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    };
+});
 
 // Swagger/OpenAPI configured via AddOpenApi/MapOpenApi
 
@@ -106,45 +143,68 @@ app.UseHttpsRedirection();
 // Global exception handling
 app.UseExceptionHandling();
 
+// Authentication (validate JWT)
+app.UseAuthentication();
+
 app.UseAuthorization();
 
 app.MapControllers();
-// Seed roles and admin user
+// Seed roles and admin user (prefer secrets / environment variables for password)
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
     var userManager = services.GetRequiredService<UserManager<User>>();
     var config = services.GetRequiredService<IConfiguration>();
+    var logger = services.GetRequiredService<ILogger<Program>>();
 
     var adminSection = config.GetSection("AdminUser");
     var adminUserName = adminSection.GetValue<string>("UserName");
     var adminEmail = adminSection.GetValue<string>("Email");
-    var adminPassword = adminSection.GetValue<string>("Password");
+    // Prefer environment variables or user-secrets. Example env var name: AdminUser__Password
+    // First check explicit environment variable, then configuration (which includes user-secrets when enabled).
+    var adminPassword = Environment.GetEnvironmentVariable("AdminUser__Password")
+                        ?? config.GetValue<string>("AdminUser:Password");
 
-    // create Admin role
+    // create Admin role if missing
     if (!roleManager.RoleExistsAsync("Admin").GetAwaiter().GetResult())
     {
-        roleManager.CreateAsync(new IdentityRole("Admin")).GetAwaiter().GetResult();
+        var r = roleManager.CreateAsync(new IdentityRole("Admin")).GetAwaiter().GetResult();
+        if (!r.Succeeded)
+        {
+            logger.LogWarning("Could not create Admin role during startup: {Errors}", string.Join(';', r.Errors.Select(e => e.Description)));
+        }
     }
 
-    // create admin user if not exists
-    var adminUser = userManager.FindByNameAsync(adminUserName).GetAwaiter().GetResult();
-    if (adminUser == null)
+    if (string.IsNullOrWhiteSpace(adminPassword))
     {
-        var user = new User
+        logger.LogWarning("Admin password not provided in configuration. Skipping admin user creation. Set AdminUser:Password via user-secrets or environment variable to seed an admin.");
+    }
+    else
+    {
+        // create admin user if not exists
+        var adminUser = userManager.FindByNameAsync(adminUserName).GetAwaiter().GetResult();
+        if (adminUser == null)
         {
-            UserName = adminUserName,
-            Email = adminEmail,
-            FirstName = "System",
-            LastName = "Administrator",
-            CreatedAt = DateTime.UtcNow,
-            isActive = true
-        };
-        var result = userManager.CreateAsync(user, adminPassword).GetAwaiter().GetResult();
-        if (result.Succeeded)
-        {
-            userManager.AddToRoleAsync(user, "Admin").GetAwaiter().GetResult();
+            var user = new User
+            {
+                UserName = adminUserName,
+                Email = adminEmail,
+                FirstName = "System",
+                LastName = "Administrator",
+                CreatedAt = DateTime.UtcNow,
+                isActive = true
+            };
+            var result = userManager.CreateAsync(user, adminPassword).GetAwaiter().GetResult();
+            if (result.Succeeded)
+            {
+                userManager.AddToRoleAsync(user, "Admin").GetAwaiter().GetResult();
+                logger.LogInformation("Admin user created: {UserName}", adminUserName);
+            }
+            else
+            {
+                logger.LogWarning("Failed to create admin user: {Errors}", string.Join(';', result.Errors.Select(e => e.Description)));
+            }
         }
     }
 }

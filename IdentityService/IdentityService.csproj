@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>f58248f1-51a6-4915-b4c3-6124f06306a1</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,7 +26,6 @@
   <ItemGroup>
     <Folder Include="Data\Enums\" />
     <Folder Include="Features\Authentication\Queries\" />
-    <Folder Include="Features\Users\Commands\" />
   </ItemGroup>
 
   <ItemGroup>

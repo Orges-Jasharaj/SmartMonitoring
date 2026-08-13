@@ -2,10 +2,13 @@ using IdentityService.Data.Models;
 using IdentityService.Features.Authentication.Commands;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
+using SmartMonitoring.Shared.Dtos.Responses;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace IdentityService.Features.Authentication.Handlers
 {
-    public class RegisterHandler : IRequestHandler<RegisterCommand, RegisterResponse>
+    public class RegisterHandler : IRequestHandler<RegisterCommand, ResponseDto<RegisterResponse>>
     {
         private readonly UserManager<User> _userManager;
 
@@ -14,7 +17,7 @@ namespace IdentityService.Features.Authentication.Handlers
             _userManager = userManager;
         }
 
-        public async Task<RegisterResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
+        public async Task<ResponseDto<RegisterResponse>> Handle(RegisterCommand request, CancellationToken cancellationToken)
         {
             var user = new User
             {
@@ -30,16 +33,19 @@ namespace IdentityService.Features.Authentication.Handlers
             var result = await _userManager.CreateAsync(user, request.Password);
             if (!result.Succeeded)
             {
-                throw new Exception(string.Join("; ", result.Errors.Select(e => e.Description)));
+                var errors = result.Errors.Select(e => new ApiError { ErrorCode = e.Code, ErrorMessage = e.Description }).ToList();
+                return ResponseDto<RegisterResponse>.Failure("User creation failed", errors);
             }
 
-            return new RegisterResponse
+            var response = new RegisterResponse
             {
                 Id = user.Id,
                 UserName = user.UserName ?? string.Empty,
                 Email = user.Email ?? string.Empty,
                 CreatedAt = user.CreatedAt
             };
+
+            return ResponseDto<RegisterResponse>.SuccessResponse(response, "User created successfully");
         }
     }
 }
