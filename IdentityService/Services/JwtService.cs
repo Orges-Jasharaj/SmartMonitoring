@@ -7,6 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using System.Security.Cryptography;
 
 namespace IdentityService.Services
 {
@@ -55,10 +56,22 @@ namespace IdentityService.Services
 
             var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
+            // generate secure refresh token
+            var refreshBytes = new byte[64];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(refreshBytes);
+            }
+            var refreshToken = Convert.ToBase64String(refreshBytes);
+            var refreshDays = jwtSection.GetValue<int?>("RefreshTokenDurationDays") ?? 7;
+            var refreshExpiresAt = DateTime.UtcNow.AddDays(refreshDays);
+
             return new JwtResult
             {
                 Token = tokenString,
-                ExpiresAt = expiresAt
+                ExpiresAt = expiresAt,
+                RefreshToken = refreshToken,
+                RefreshTokenExpiresAt = refreshExpiresAt
             };
         }
     }

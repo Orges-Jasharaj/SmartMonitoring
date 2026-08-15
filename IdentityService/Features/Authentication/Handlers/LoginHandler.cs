@@ -40,6 +40,15 @@ namespace IdentityService.Features.Authentication.Handlers
 
             var roles = await _userManager.GetRolesAsync(user);
             var jwt = _jwtService.GenerateToken(user, roles);
+
+            // store refresh token and expiry on user
+            if (!string.IsNullOrEmpty(jwt.RefreshToken))
+            {
+                user.RefreshToken = jwt.RefreshToken;
+                user.RefreshTokenExpiryTime = jwt.RefreshTokenExpiresAt;
+                await _userManager.UpdateAsync(user);
+            }
+
             return ResponseDto<JwtResult>.SuccessResponse(jwt, "Login successful");
         }
     }
