@@ -33,7 +33,13 @@ namespace SmartMonitoring.Shared.Middleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An unhandled exception occurred.");
+                var correlationId = context.Items[CorrelationIdMiddleware.ItemKey]?.ToString()
+                    ?? context.TraceIdentifier;
+
+                _logger.LogError(
+                    ex,
+                    "An unhandled exception occurred. CorrelationId={CorrelationId}",
+                    correlationId);
                 await HandleExceptionAsync(context, ex);
             }
         }

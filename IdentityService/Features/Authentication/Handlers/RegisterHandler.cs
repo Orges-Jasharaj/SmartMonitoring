@@ -3,18 +3,19 @@ using IdentityService.Features.Authentication.Commands;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 using SmartMonitoring.Shared.Dtos.Responses;
-using System.Linq;
-using System.Collections.Generic;
+using SmartMonitoring.Shared.Observability;
 
 namespace IdentityService.Features.Authentication.Handlers
 {
     public class RegisterHandler : IRequestHandler<RegisterCommand, ResponseDto<RegisterResponse>>
     {
         private readonly UserManager<User> _userManager;
+        private readonly ILogger<RegisterHandler> _logger;
 
-        public RegisterHandler(UserManager<User> userManager)
+        public RegisterHandler(UserManager<User> userManager, ILogger<RegisterHandler> logger)
         {
             _userManager = userManager;
+            _logger = logger;
         }
 
         public async Task<ResponseDto<RegisterResponse>> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -34,6 +35,11 @@ namespace IdentityService.Features.Authentication.Handlers
             if (!result.Succeeded)
             {
                 var errors = result.Errors.Select(e => new ApiError { ErrorCode = e.Code, ErrorMessage = e.Description }).ToList();
+                _logger.LogAuditEvent(
+                    "UserRegister",
+                    "Failed",
+                    actorUserName: request.UserName,
+                    detail: string.Join(';', errors.Select(e => e.ErrorMessage)));
                 return ResponseDto<RegisterResponse>.Failure("User creation failed", errors);
             }
 
@@ -44,6 +50,12 @@ namespace IdentityService.Features.Authentication.Handlers
                 Email = user.Email ?? string.Empty,
                 CreatedAt = user.CreatedAt
             };
+
+            _logger.LogAuditEvent(
+                "UserRegister",
+                "Success",
+                actorUserId: user.Id,
+                actorUserName: user.UserName);
 
             return ResponseDto<RegisterResponse>.SuccessResponse(response, "User created successfully");
         }

@@ -3,8 +3,8 @@ using IdentityService.Features.Authentication.Commands;
 using IdentityService.Services;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
-using System.Collections.Generic;
 using SmartMonitoring.Shared.Dtos.Responses;
+using SmartMonitoring.Shared.Observability;
 
 namespace IdentityService.Features.Authentication.Handlers
 {
@@ -12,42 +12,77 @@ namespace IdentityService.Features.Authentication.Handlers
     {
         private readonly UserManager<User> _userManager;
         private readonly IJwtService _jwtService;
+        private readonly ILogger<LoginHandler> _logger;
 
-        public LoginHandler(UserManager<User> userManager, IJwtService jwtService)
+        public LoginHandler(
+            UserManager<User> userManager,
+            IJwtService jwtService,
+            ILogger<LoginHandler> logger)
         {
             _userManager = userManager;
             _jwtService = jwtService;
+            _logger = logger;
         }
 
         public async Task<ResponseDto<JwtResult>> Handle(LoginQuery request, CancellationToken cancellationToken)
         {
-            var user = await _userManager.FindByNameAsync(request.UserNameOrEmail) ?? await _userManager.FindByEmailAsync(request.UserNameOrEmail);
+            var user = await _userManager.FindByNameAsync(request.UserNameOrEmail)
+                ?? await _userManager.FindByEmailAsync(request.UserNameOrEmail);
+
             if (user == null)
             {
-                return ResponseDto<JwtResult>.Failure("Invalid credentials", new List<ApiError> { new ApiError { ErrorMessage = "User not found" } });
+                _logger.LogAuditEvent(
+                    "UserLogin",
+                    "Failed",
+                    actorUserName: request.UserNameOrEmail,
+                    detail: "UserNotFound");
+                return ResponseDto<JwtResult>.Failure(
+                    "Invalid credentials",
+                    [new ApiError { ErrorMessage = "Invalid credentials" }]);
             }
 
             if (!user.isActive)
             {
-                return ResponseDto<JwtResult>.Failure("User is deactivated", new List<ApiError> { new ApiError { ErrorMessage = "User account is deactivated" } });
+                _logger.LogAuditEvent(
+                    "UserLogin",
+                    "Failed",
+                    actorUserId: user.Id,
+                    actorUserName: user.UserName,
+                    detail: "UserDeactivated");
+                return ResponseDto<JwtResult>.Failure(
+                    "Invalid credentials",
+                    [new ApiError { ErrorMessage = "Invalid credentials" }]);
             }
 
             var valid = await _userManager.CheckPasswordAsync(user, request.Password);
             if (!valid)
             {
-                return ResponseDto<JwtResult>.Failure("Invalid credentials", new List<ApiError> { new ApiError { ErrorMessage = "Invalid password" } });
+                _logger.LogAuditEvent(
+                    "UserLogin",
+                    "Failed",
+                    actorUserId: user.Id,
+                    actorUserName: user.UserName,
+                    detail: "InvalidPassword");
+                return ResponseDto<JwtResult>.Failure(
+                    "Invalid credentials",
+                    [new ApiError { ErrorMessage = "Invalid credentials" }]);
             }
 
             var roles = await _userManager.GetRolesAsync(user);
             var jwt = _jwtService.GenerateToken(user, roles);
 
-            // store refresh token and expiry on user
             if (!string.IsNullOrEmpty(jwt.RefreshToken))
             {
                 user.RefreshToken = jwt.RefreshToken;
                 user.RefreshTokenExpiryTime = jwt.RefreshTokenExpiresAt;
                 await _userManager.UpdateAsync(user);
             }
+
+            _logger.LogAuditEvent(
+                "UserLogin",
+                "Success",
+                actorUserId: user.Id,
+                actorUserName: user.UserName);
 
             return ResponseDto<JwtResult>.SuccessResponse(jwt, "Login successful");
         }

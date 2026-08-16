@@ -1,10 +1,9 @@
 using IdentityService.Data.Models;
 using System.Collections.Generic;
 
-namespace IdentityService.Services
+namespace IdentityService.Services;
+
+public interface IJwtService
 {
-    public interface IJwtService
-    {
-        JwtResult GenerateToken(User user, IEnumerable<string> roles);
-    }
+    JwtResult GenerateToken(User user, IEnumerable<string> roles);
 }

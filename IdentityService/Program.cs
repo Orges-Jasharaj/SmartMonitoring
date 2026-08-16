@@ -6,11 +6,21 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using SmartMonitoring.Shared.Middleware;
+using SmartMonitoring.Shared.Observability;
 using System;
 using System.Text;
 
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddObservability();
 
 // Add services to the container.
 
@@ -47,12 +57,19 @@ builder.Services.AddSwaggerGen(c =>
 
 // MediatR
 builder.Services.AddMediatR(typeof(Program).Assembly);
+builder.Services.AddMediatRObservability();
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<IdentityAppDbContext>();
 
 // JWT configuration
 var jwtSection = builder.Configuration.GetSection("Jwt");
-var jwtKey = jwtSection.GetValue<string>("Key");
-var jwtIssuer = jwtSection.GetValue<string>("Issuer");
-var jwtAudience = jwtSection.GetValue<string>("Audience");
+var jwtKey = jwtSection.GetValue<string>("Key")
+    ?? throw new InvalidOperationException("Jwt:Key must be configured.");
+var jwtIssuer = jwtSection.GetValue<string>("Issuer")
+    ?? throw new InvalidOperationException("Jwt:Issuer must be configured.");
+var jwtAudience = jwtSection.GetValue<string>("Audience")
+    ?? throw new InvalidOperationException("Jwt:Audience must be configured.");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -86,8 +103,8 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options 
     options.InvalidModelStateResponseFactory = context =>
     {
         var errors = context.ModelState
-            .Where(kvp => kvp.Value.Errors.Count > 0)
-            .SelectMany(kvp => kvp.Value.Errors.Select(e => new SmartMonitoring.Shared.Dtos.Responses.ApiError { ErrorMessage = e.ErrorMessage }))
+            .Where(kvp => kvp.Value?.Errors.Count > 0)
+            .SelectMany(kvp => kvp.Value!.Errors.Select(e => new SmartMonitoring.Shared.Dtos.Responses.ApiError { ErrorMessage = e.ErrorMessage }))
             .ToList();
 
         var resp = SmartMonitoring.Shared.Dtos.Responses.ResponseDto<object>.Failure("Validation failed", errors);
@@ -128,6 +145,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 var app = builder.Build();
 
+app.UseObservability();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -138,29 +157,38 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
-
-// Global exception handling
-app.UseExceptionHandling();
+if (!builder.Configuration.GetValue<bool>("DisableHttpsRedirection"))
+{
+    app.UseHttpsRedirection();
+}
 
 // Authentication (validate JWT)
 app.UseAuthentication();
 
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
 app.MapControllers();
-// Seed roles and admin user (prefer secrets / environment variables for password)
+
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-    var userManager = services.GetRequiredService<UserManager<User>>();
     var config = services.GetRequiredService<IConfiguration>();
     var logger = services.GetRequiredService<ILogger<Program>>();
 
+    if (config.GetValue<bool>("Database:RunMigrationsOnStartup"))
+    {
+        var db = services.GetRequiredService<IdentityAppDbContext>();
+        db.Database.Migrate();
+        logger.LogInformation("Database migrations applied.");
+    }
+
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = services.GetRequiredService<UserManager<User>>();
+
     var adminSection = config.GetSection("AdminUser");
-    var adminUserName = adminSection.GetValue<string>("UserName");
-    var adminEmail = adminSection.GetValue<string>("Email");
+    var adminUserName = adminSection.GetValue<string>("UserName") ?? "admin";
+    var adminEmail = adminSection.GetValue<string>("Email") ?? "admin@localhost";
     // Prefer environment variables or user-secrets. Example env var name: AdminUser__Password
     // First check explicit environment variable, then configuration (which includes user-secrets when enabled).
     var adminPassword = Environment.GetEnvironmentVariable("AdminUser__Password")
@@ -210,3 +238,12 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "IdentityService terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

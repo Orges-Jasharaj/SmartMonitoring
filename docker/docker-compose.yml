@@ -1,0 +1,90 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "SmartMonitoring@123"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+  identity-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DisableHttpsRedirection: "true"
+      Database__RunMigrationsOnStartup: "true"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=SmartMonitoringIdentityDb;User Id=sa;Password=SmartMonitoring@123;TrustServerCertificate=True;"
+      Jwt__Key: "DockerDevJwtKey-MustBeAtLeast32CharactersLong!"
+      Jwt__Issuer: SmartMonitoring.Identity
+      Jwt__Audience: SmartMonitoring.Clients
+      Observability__LokiUrl: http://loki:3100
+      Observability__OtlpEndpoint: http://tempo:4317
+      Observability__RestrictMetricsToLocalhost: "false"
+      AdminUser__Password: "Admin@123456"
+    depends_on:
+      - sqlserver
+      - loki
+      - tempo
+
+  loki:
+    image: grafana/loki:3.0.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml
+      - loki-data:/loki
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    depends_on:
+      - identity-service
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/tempo.yml
+      - tempo-data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - prometheus
+      - tempo
+      - identity-service
+
+volumes:
+  sqlserver-data:
+  loki-data:
+  prometheus-data:
+  tempo-data:
+  grafana-data:

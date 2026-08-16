@@ -1,78 +1,108 @@
 using IdentityService.Data.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
-using System.Text;
 using System.Security.Cryptography;
+using System.Text;
 
-namespace IdentityService.Services
+namespace IdentityService.Services;
+
+public class JwtService : IJwtService
 {
-    public class JwtService : IJwtService
+    private readonly IConfiguration _configuration;
+
+    public JwtService(IConfiguration configuration)
     {
-        private readonly IConfiguration _configuration;
+        _configuration = configuration;
+    }
 
-        public JwtService(IConfiguration configuration)
+    public JwtResult GenerateToken(User user, IEnumerable<string> roles)
+    {
+        var settings = GetJwtSettings();
+
+        var claims = new List<Claim>
         {
-            _configuration = configuration;
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new(ClaimTypes.Name, user.UserName ?? string.Empty)
+        };
+
+        if (roles != null)
+        {
+            claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         }
 
-        public JwtResult GenerateToken(User user, IEnumerable<string> roles)
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Key));
+        var creds = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+        var expiresAt = DateTime.UtcNow.AddMinutes(settings.DurationMinutes);
+
+        var token = new JwtSecurityToken(
+            issuer: settings.Issuer,
+            audience: settings.Audience,
+            claims: claims,
+            expires: expiresAt,
+            signingCredentials: creds);
+
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+        var refreshToken = GenerateRefreshTokenValue();
+        var refreshExpiresAt = DateTime.UtcNow.AddDays(settings.RefreshTokenDurationDays);
+
+        return new JwtResult
         {
-            var jwtSection = _configuration.GetSection("Jwt");
-            var key = jwtSection.GetValue<string>("Key");
-            var issuer = jwtSection.GetValue<string>("Issuer");
-            var audience = jwtSection.GetValue<string>("Audience");
-            var duration = jwtSection.GetValue<int>("DurationMinutes");
+            Token = tokenString,
+            ExpiresAt = expiresAt,
+            RefreshToken = refreshToken,
+            RefreshTokenExpiresAt = refreshExpiresAt
+        };
+    }
 
-            var claims = new List<Claim>
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-                new Claim(ClaimTypes.Name, user.UserName ?? string.Empty)
-            };
+    internal static string GenerateRefreshTokenValue()
+    {
+        var refreshBytes = new byte[64];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(refreshBytes);
+        return Convert.ToBase64String(refreshBytes);
+    }
 
-            if (roles != null)
-            {
-                claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
-            }
+    private JwtSettings GetJwtSettings()
+    {
+        var jwtSection = _configuration.GetSection("Jwt");
+        var key = jwtSection.GetValue<string>("Key");
+        var issuer = jwtSection.GetValue<string>("Issuer");
+        var audience = jwtSection.GetValue<string>("Audience");
 
-            var keyBytes = Encoding.UTF8.GetBytes(key);
-            var signingKey = new SymmetricSecurityKey(keyBytes);
-            var creds = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
-
-            var expiresAt = DateTime.UtcNow.AddMinutes(duration);
-
-            var token = new JwtSecurityToken(
-                issuer: issuer,
-                audience: audience,
-                claims: claims,
-                expires: expiresAt,
-                signingCredentials: creds
-            );
-
-            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-
-            // generate secure refresh token
-            var refreshBytes = new byte[64];
-            using (var rng = RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(refreshBytes);
-            }
-            var refreshToken = Convert.ToBase64String(refreshBytes);
-            var refreshDays = jwtSection.GetValue<int?>("RefreshTokenDurationDays") ?? 7;
-            var refreshExpiresAt = DateTime.UtcNow.AddDays(refreshDays);
-
-            return new JwtResult
-            {
-                Token = tokenString,
-                ExpiresAt = expiresAt,
-                RefreshToken = refreshToken,
-                RefreshTokenExpiresAt = refreshExpiresAt
-            };
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            throw new InvalidOperationException("Jwt:Key is not configured.");
         }
+
+        if (string.IsNullOrWhiteSpace(issuer))
+        {
+            throw new InvalidOperationException("Jwt:Issuer is not configured.");
+        }
+
+        if (string.IsNullOrWhiteSpace(audience))
+        {
+            throw new InvalidOperationException("Jwt:Audience is not configured.");
+        }
+
+        return new JwtSettings
+        {
+            Key = key,
+            Issuer = issuer,
+            Audience = audience,
+            DurationMinutes = jwtSection.GetValue<int>("DurationMinutes"),
+            RefreshTokenDurationDays = jwtSection.GetValue<int?>("RefreshTokenDurationDays") ?? 7
+        };
+    }
+
+    private sealed class JwtSettings
+    {
+        public required string Key { get; init; }
+        public required string Issuer { get; init; }
+        public required string Audience { get; init; }
+        public int DurationMinutes { get; init; }
+        public int RefreshTokenDurationDays { get; init; }
     }
 }
