@@ -117,9 +117,12 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options 
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddIdentity<User, IdentityRole>()
-                .AddEntityFrameworkStores<IdentityAppDbContext>()
-                .AddDefaultTokenProviders();
+builder.Services.AddIdentity<User, IdentityRole>(options =>
+{
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<IdentityAppDbContext>()
+.AddDefaultTokenProviders();
 
 // Ensure JWT is used as the default authentication/challenge scheme (AddIdentity may override defaults)
 builder.Services.PostConfigure<Microsoft.AspNetCore.Authentication.AuthenticationOptions>(options =>

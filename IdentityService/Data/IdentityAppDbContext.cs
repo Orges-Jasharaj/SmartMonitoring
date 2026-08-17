@@ -9,5 +9,18 @@ namespace IdentityService.Data
         public IdentityAppDbContext(DbContextOptions<IdentityAppDbContext> options) : base(options)
         {
         }
+
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            builder.Entity<User>(entity =>
+            {
+                entity.HasIndex(u => u.NormalizedEmail)
+                    .IsUnique()
+                    .HasDatabaseName("EmailIndex")
+                    .HasFilter("[NormalizedEmail] IS NOT NULL");
+            });
+        }
     }
 }
