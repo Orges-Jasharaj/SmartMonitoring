@@ -2,41 +2,61 @@ using IdentityService.Data.Models;
 using IdentityService.Features.Users.Commands;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
-using SmartMonitoring.Shared.Observability;
+using SmartMonitoring.Shared.Audit;
 
-namespace IdentityService.Features.Users.Handlers
+namespace IdentityService.Features.Users.Handlers;
+
+public class ActivateUserHandler : IRequestHandler<ActivateUserCommand, SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>>
 {
-    public class ActivateUserHandler : IRequestHandler<ActivateUserCommand, SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>>
+    private readonly UserManager<User> _userManager;
+    private readonly IAuditRecorder _auditRecorder;
+
+    public ActivateUserHandler(UserManager<User> userManager, IAuditRecorder auditRecorder)
     {
-        private readonly UserManager<User> _userManager;
-        private readonly ILogger<ActivateUserHandler> _logger;
+        _userManager = userManager;
+        _auditRecorder = auditRecorder;
+    }
 
-        public ActivateUserHandler(UserManager<User> userManager, ILogger<ActivateUserHandler> logger)
+    public async Task<SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>> Handle(
+        ActivateUserCommand request,
+        CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(request.Id);
+        if (user == null)
         {
-            _userManager = userManager;
-            _logger = logger;
+            await _auditRecorder.RecordAsync(
+                "ActivateUser",
+                "Failed",
+                targetEntityType: "User",
+                targetEntityId: request.Id,
+                detail: "UserNotFound",
+                cancellationToken: cancellationToken);
+            return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.Failure("User not found");
         }
 
-        public async Task<SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>> Handle(ActivateUserCommand request, CancellationToken cancellationToken)
+        user.isActive = true;
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
         {
-            var user = await _userManager.FindByIdAsync(request.Id);
-            if (user == null)
-            {
-                _logger.LogAuditEvent("ActivateUser", "Failed", targetUserId: request.Id, detail: "UserNotFound");
-                return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.Failure("User not found");
-            }
-
-            user.isActive = true;
-            var result = await _userManager.UpdateAsync(user);
-            if (!result.Succeeded)
-            {
-                var errors = result.Errors.Select(e => new SmartMonitoring.Shared.Dtos.Responses.ApiError { ErrorCode = e.Code, ErrorMessage = e.Description }).ToList();
-                _logger.LogAuditEvent("ActivateUser", "Failed", targetUserId: user.Id, targetUserName: user.UserName, detail: "UpdateFailed");
-                return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.Failure("Failed to activate user", errors);
-            }
-
-            _logger.LogAuditEvent("ActivateUser", "Success", targetUserId: user.Id, targetUserName: user.UserName);
-            return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.SuccessResponse(true, "User activated");
+            var errors = result.Errors.Select(e => new SmartMonitoring.Shared.Dtos.Responses.ApiError { ErrorCode = e.Code, ErrorMessage = e.Description }).ToList();
+            await _auditRecorder.RecordAsync(
+                "ActivateUser",
+                "Failed",
+                targetEntityType: "User",
+                targetEntityId: user.Id,
+                targetUserName: user.UserName,
+                detail: "UpdateFailed",
+                cancellationToken: cancellationToken);
+            return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.Failure("Failed to activate user", errors);
         }
+
+        await _auditRecorder.RecordAsync(
+            "ActivateUser",
+            "Success",
+            targetEntityType: "User",
+            targetEntityId: user.Id,
+            targetUserName: user.UserName,
+            cancellationToken: cancellationToken);
+        return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<bool>.SuccessResponse(true, "User activated");
     }
 }

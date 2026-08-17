@@ -4,8 +4,8 @@ using IdentityService.Services;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using SmartMonitoring.Shared.Audit;
 using SmartMonitoring.Shared.Dtos.Responses;
-using SmartMonitoring.Shared.Observability;
 
 namespace IdentityService.Features.Authentication.Handlers;
 
@@ -13,16 +13,16 @@ public class RefreshTokenHandler : IRequestHandler<RefreshTokenCommand, Response
 {
     private readonly UserManager<User> _userManager;
     private readonly IJwtService _jwtService;
-    private readonly ILogger<RefreshTokenHandler> _logger;
+    private readonly IAuditRecorder _auditRecorder;
 
     public RefreshTokenHandler(
         UserManager<User> userManager,
         IJwtService jwtService,
-        ILogger<RefreshTokenHandler> logger)
+        IAuditRecorder auditRecorder)
     {
         _userManager = userManager;
         _jwtService = jwtService;
-        _logger = logger;
+        _auditRecorder = auditRecorder;
     }
 
     public async Task<ResponseDto<JwtResult>> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
@@ -36,7 +36,11 @@ public class RefreshTokenHandler : IRequestHandler<RefreshTokenCommand, Response
             || user.RefreshTokenExpiryTime is null
             || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
         {
-            _logger.LogAuditEvent("RefreshToken", "Failed", detail: "InvalidOrExpiredToken");
+            await _auditRecorder.RecordAsync(
+                "RefreshToken",
+                "Failed",
+                detail: "InvalidOrExpiredToken",
+                cancellationToken: cancellationToken);
             return ResponseDto<JwtResult>.Failure(
                 "Invalid refresh token",
                 [new ApiError { ErrorMessage = "Invalid refresh token" }]);
@@ -44,12 +48,15 @@ public class RefreshTokenHandler : IRequestHandler<RefreshTokenCommand, Response
 
         if (!user.isActive)
         {
-            _logger.LogAuditEvent(
+            await _auditRecorder.RecordAsync(
                 "RefreshToken",
                 "Failed",
                 actorUserId: user.Id,
                 actorUserName: user.UserName,
-                detail: "UserDeactivated");
+                targetEntityType: "User",
+                targetEntityId: user.Id,
+                detail: "UserDeactivated",
+                cancellationToken: cancellationToken);
             return ResponseDto<JwtResult>.Failure(
                 "Invalid refresh token",
                 [new ApiError { ErrorMessage = "Invalid refresh token" }]);
@@ -62,11 +69,14 @@ public class RefreshTokenHandler : IRequestHandler<RefreshTokenCommand, Response
         user.RefreshTokenExpiryTime = jwt.RefreshTokenExpiresAt;
         await _userManager.UpdateAsync(user);
 
-        _logger.LogAuditEvent(
+        await _auditRecorder.RecordAsync(
             "RefreshToken",
             "Success",
             actorUserId: user.Id,
-            actorUserName: user.UserName);
+            actorUserName: user.UserName,
+            targetEntityType: "User",
+            targetEntityId: user.Id,
+            cancellationToken: cancellationToken);
 
         return ResponseDto<JwtResult>.SuccessResponse(jwt, "Token refreshed");
     }

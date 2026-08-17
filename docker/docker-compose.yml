@@ -27,7 +27,33 @@ services:
       Observability__LokiUrl: http://loki:3100
       Observability__OtlpEndpoint: http://tempo:4317
       Observability__RestrictMetricsToLocalhost: "false"
+      Audit__Enabled: "true"
+      Audit__ServiceName: IdentityService
+      Audit__BaseUrl: http://audit-logging:8081
+      Audit__ApiKey: dev-audit-api-key-change-in-production
       AdminUser__Password: "Admin@123456"
+    depends_on:
+      - sqlserver
+      - loki
+      - tempo
+      - audit-logging
+
+  audit-logging:
+    build:
+      context: ..
+      dockerfile: AuditLogging/Dockerfile
+    restart: on-failure
+    ports:
+      - "8081:8081"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DisableHttpsRedirection: "true"
+      Database__RunMigrationsOnStartup: "true"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=SmartMonitoringAuditDb;User Id=sa;Password=SmartMonitoring@123;TrustServerCertificate=True;"
+      Observability__LokiUrl: http://loki:3100
+      Observability__OtlpEndpoint: http://tempo:4317
+      Observability__RestrictMetricsToLocalhost: "false"
+      AuditApiKey__ApiKey: dev-audit-api-key-change-in-production
     depends_on:
       - sqlserver
       - loki

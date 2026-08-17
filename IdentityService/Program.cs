@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using SmartMonitoring.Shared.Middleware;
+using SmartMonitoring.Shared.Audit;
 using SmartMonitoring.Shared.Observability;
 using System;
 using System.Text;
@@ -21,6 +22,7 @@ try
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddObservability();
+builder.Services.AddAuditPublishing(builder.Configuration);
 
 // Add services to the container.
 
