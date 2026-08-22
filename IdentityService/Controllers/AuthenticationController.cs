@@ -50,5 +50,22 @@ namespace IdentityService.Controllers
 
             return Ok(result);
         }
+
+        [HttpGet("confirm-email")]
+        public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string token)
+        {
+            var response = await _mediator.Send(new ConfirmEmailCommand
+            {
+                UserId = userId,
+                Token = token
+            });
+
+            if (!response.Success)
+            {
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
     }
 }

@@ -32,11 +32,25 @@ services:
       Audit__BaseUrl: http://audit-logging:8081
       Audit__ApiKey: dev-audit-api-key-change-in-production
       AdminUser__Password: "Admin@123456"
+      Email__Enabled: "true"
+      Email__Host: mailpit
+      Email__Port: "1025"
+      Email__UseSsl: "false"
+      Email__FromAddress: noreply@smartmonitoring.local
+      Email__FromName: SmartMonitoring
+      Email__ConfirmationBaseUrl: http://localhost:8088/identity/api/authentication/confirm-email
     depends_on:
       - sqlserver
       - loki
       - tempo
       - audit-logging
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
   api-gateway:
     build:

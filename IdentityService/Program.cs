@@ -1,6 +1,7 @@
 using IdentityService.Data;
 using IdentityService.Data.Models;
 using IdentityService.Services;
+using IdentityService.Services.Email;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -117,9 +118,14 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options 
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+var emailEnabled = builder.Configuration.GetValue<bool>("Email:Enabled");
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+
 builder.Services.AddIdentity<User, IdentityRole>(options =>
 {
     options.User.RequireUniqueEmail = true;
+    options.SignIn.RequireConfirmedEmail = emailEnabled;
 })
 .AddEntityFrameworkStores<IdentityAppDbContext>()
 .AddDefaultTokenProviders();
@@ -226,7 +232,8 @@ using (var scope = app.Services.CreateScope())
                 FirstName = "System",
                 LastName = "Administrator",
                 CreatedAt = DateTime.UtcNow,
-                isActive = true
+                isActive = true,
+                EmailConfirmed = true
             };
             var result = userManager.CreateAsync(user, adminPassword).GetAwaiter().GetResult();
             if (result.Succeeded)

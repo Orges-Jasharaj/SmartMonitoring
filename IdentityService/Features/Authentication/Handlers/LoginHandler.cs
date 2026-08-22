@@ -1,8 +1,10 @@
 using IdentityService.Data.Models;
 using IdentityService.Features.Authentication.Commands;
 using IdentityService.Services;
+using IdentityService.Services.Email;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using SmartMonitoring.Shared.Audit;
 using SmartMonitoring.Shared.Dtos.Responses;
 
@@ -13,15 +15,18 @@ public class LoginHandler : IRequestHandler<LoginQuery, ResponseDto<JwtResult>>
     private readonly UserManager<User> _userManager;
     private readonly IJwtService _jwtService;
     private readonly IAuditRecorder _auditRecorder;
+    private readonly EmailOptions _emailOptions;
 
     public LoginHandler(
         UserManager<User> userManager,
         IJwtService jwtService,
-        IAuditRecorder auditRecorder)
+        IAuditRecorder auditRecorder,
+        IOptions<EmailOptions> emailOptions)
     {
         _userManager = userManager;
         _jwtService = jwtService;
         _auditRecorder = auditRecorder;
+        _emailOptions = emailOptions.Value;
     }
 
     public async Task<ResponseDto<JwtResult>> Handle(LoginQuery request, CancellationToken cancellationToken)
@@ -57,6 +62,22 @@ public class LoginHandler : IRequestHandler<LoginQuery, ResponseDto<JwtResult>>
             return ResponseDto<JwtResult>.Failure(
                 "Invalid credentials",
                 [new ApiError { ErrorMessage = "Invalid credentials" }]);
+        }
+
+        if (_emailOptions.Enabled && !user.EmailConfirmed)
+        {
+            await _auditRecorder.RecordAsync(
+                "UserLogin",
+                "Failed",
+                actorUserId: user.Id,
+                actorUserName: user.UserName,
+                targetEntityType: "User",
+                targetEntityId: user.Id,
+                detail: "EmailNotConfirmed",
+                cancellationToken: cancellationToken);
+            return ResponseDto<JwtResult>.Failure(
+                "Email not confirmed",
+                [new ApiError { ErrorMessage = "Please confirm your email before logging in." }]);
         }
 
         var valid = await _userManager.CheckPasswordAsync(user, request.Password);
