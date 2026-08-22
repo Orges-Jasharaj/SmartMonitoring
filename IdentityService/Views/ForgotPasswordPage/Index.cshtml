@@ -1,0 +1,21 @@
+@{
+    ViewData["Title"] = "Forgot password";
+    var error = ViewData["Error"]?.ToString();
+}
+
+<h1>Forgot your password?</h1>
+<p class="hint">Enter your email or username. We will send you a link to reset your password.</p>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <p class="error">@error</p>
+}
+
+<form method="post">
+    <label for="emailOrUserName">Email or username</label>
+    <input id="emailOrUserName" name="emailOrUserName" type="text" required autocomplete="username" />
+
+    <button type="submit">Send reset link</button>
+</form>
+
+<p class="hint">Open <a href="http://localhost:8025" target="_blank">Mailpit</a> in development to read the email.</p>

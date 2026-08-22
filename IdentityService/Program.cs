@@ -27,7 +27,7 @@ builder.Services.AddAuditPublishing(builder.Configuration);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews();
 
 // Swagger / OpenAPI (Swashbuckle)
 builder.Services.AddSwaggerGen(c =>

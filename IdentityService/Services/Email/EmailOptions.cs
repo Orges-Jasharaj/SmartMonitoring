@@ -13,4 +13,6 @@ public class EmailOptions
     public string FromAddress { get; set; } = "noreply@smartmonitoring.local";
     public string FromName { get; set; } = "SmartMonitoring";
     public string ConfirmationBaseUrl { get; set; } = "http://localhost:8088/identity/api/authentication/confirm-email";
+    public string ForgotPasswordBaseUrl { get; set; } = "http://localhost:8088/identity/forgot-password";
+    public string ResetPasswordBaseUrl { get; set; } = "http://localhost:8088/identity/reset-password";
 }

@@ -39,6 +39,7 @@ services:
       Email__FromAddress: noreply@smartmonitoring.local
       Email__FromName: SmartMonitoring
       Email__ConfirmationBaseUrl: http://localhost:8088/identity/api/authentication/confirm-email
+      Email__ResetPasswordBaseUrl: http://localhost:8088/identity/reset-password
     depends_on:
       - sqlserver
       - loki

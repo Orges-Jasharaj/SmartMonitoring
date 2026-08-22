@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = "Reset password";
+    var userId = ViewData["UserId"]?.ToString() ?? string.Empty;
+    var token = ViewData["Token"]?.ToString() ?? string.Empty;
+    var error = ViewData["Error"]?.ToString();
+}
+
+<h1>Reset your password</h1>
+<p class="hint">Choose a new password for your SmartMonitoring account.</p>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <p class="error">@error</p>
+}
+
+<form method="post">
+    <input type="hidden" name="userId" value="@userId" />
+    <input type="hidden" name="token" value="@token" />
+
+    <label for="newPassword">New password</label>
+    <input id="newPassword" name="newPassword" type="password" required minlength="6" autocomplete="new-password" />
+
+    <label for="confirmPassword">Confirm password</label>
+    <input id="confirmPassword" name="confirmPassword" type="password" required minlength="6" autocomplete="new-password" />
+
+    <button type="submit">Reset password</button>
+</form>
