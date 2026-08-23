@@ -388,6 +388,261 @@ th {
   font-weight: 600;
 }
 
+.page-loading {
+  padding: 2rem 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+}
+
+.stat-card {
+  background: rgba(18, 27, 46, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+}
+
+.stat-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.stat-danger {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.stat-ok {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.stat-warning {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.tab-badge {
+  margin-left: 0.35rem;
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.7rem;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.company-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.company-card {
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  padding: 1rem;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.company-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.company-card-top,
+.company-card-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.company-card-stats {
+  font-size: 0.9rem;
+}
+
+.ok-text {
+  color: #86efac;
+}
+
+.danger-text {
+  color: #fca5a5;
+}
+
+.link-card {
+  display: block;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.link-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.temp-reading {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.status-list,
+.team-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-row,
+.team-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg);
+}
+
+.status-row {
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.status-row:hover {
+  border-color: var(--primary);
+}
+
+.status-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.team-row {
+  background: var(--bg);
+}
+
+.alert-list.compact .alert-item {
+  padding: 0.65rem 0.75rem;
+}
+
+.alert-item.resolved {
+  border-color: var(--border);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.inline-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chart-wrap {
+  width: 100%;
+}
+
+.chart-empty {
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.chart-legend {
+  margin-top: 0.5rem;
+}
+
+.legend-safe {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 100;
+}
+
+.toast {
+  min-width: 220px;
+  max-width: 360px;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: rgba(18, 27, 46, 0.96);
+  box-shadow: var(--shadow);
+  animation: toast-in 0.2s ease;
+}
+
+.toast-success {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.toast-error {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.toast-info {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 900px) {
   .grid.two-col {
     grid-template-columns: 1fr;

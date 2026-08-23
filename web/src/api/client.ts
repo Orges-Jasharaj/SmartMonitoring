@@ -2,6 +2,7 @@ import type {
   Alert,
   ApiResponse,
   Company,
+  CompanyUser,
   Device,
   DeviceCreated,
   JwtResult,
@@ -100,6 +101,14 @@ export const api = {
       params.set('deviceId', deviceId);
     }
     return request<Reading[]>(`/monitoring/api/companies/${companyId}/readings?${params}`, { token });
+  },
+
+  getDevice(token: string, deviceId: string) {
+    return request<Device>(`/monitoring/api/devices/${deviceId}`, { token });
+  },
+
+  getCompanyUsers(token: string, companyId: string) {
+    return request<CompanyUser[]>(`/monitoring/api/companies/${companyId}/users`, { token });
   },
 
   getUsers(token: string) {

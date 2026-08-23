@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth();
+  const { pushToast } = useToast();
   const navigate = useNavigate();
   const [userNameOrEmail, setUserNameOrEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,6 +31,7 @@ export function LoginPage() {
     }
 
     login(response.data.token, response.data.expiresAt);
+    pushToast('Welcome back!', 'success');
     navigate('/');
   }
 

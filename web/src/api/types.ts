@@ -65,3 +65,19 @@ export type User = {
   isActive: boolean;
   roles: string[];
 };
+
+export type CompanyUser = {
+  id: string;
+  companyId: string;
+  userId: string;
+  role: string;
+  assignedAtUtc: string;
+};
+
+export type CompanySummary = {
+  company: Company;
+  deviceCount: number;
+  activeAlerts: number;
+  devicesOk: number;
+  devicesAlerting: number;
+};

@@ -16,7 +16,7 @@ export function Layout() {
         </div>
         <nav className="topnav">
           <NavLink to="/" end>
-            Companies
+            Dashboard
           </NavLink>
         </nav>
         <button type="button" className="btn btn-ghost" onClick={logout}>
