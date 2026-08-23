@@ -7,3 +7,5 @@
 **/*.suo
 **/docker
 **/.cursor
+web/node_modules
+web/dist

@@ -208,6 +208,16 @@ services:
       - tempo
       - identity-service
 
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    restart: on-failure
+    ports:
+      - "5173:80"
+    depends_on:
+      - api-gateway
+
 volumes:
   sqlserver-data:
   loki-data:

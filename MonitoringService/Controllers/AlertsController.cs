@@ -7,7 +7,7 @@ namespace MonitoringService.Controllers;
 
 [ApiController]
 [Route("api/companies/{companyId:guid}/[controller]")]
-//[Authorize]
+[Authorize]
 public class AlertsController(IMediator mediator) : ControllerBase
 {
     [HttpGet]
