@@ -35,7 +35,6 @@ public class AlertEvaluator(
 
                 if (ShouldSendReminder(activeAlert))
                 {
-                    activeAlert.LastNotifiedAtUtc = DateTime.UtcNow;
                     alertsToNotify.Add(activeAlert);
                 }
 
@@ -51,7 +50,6 @@ public class AlertEvaluator(
                 Message = BuildOutOfRangeMessage(device, temperatureC, isStillOutOfRange: false),
                 TemperatureC = temperatureC,
                 TriggeredAtUtc = DateTime.UtcNow,
-                LastNotifiedAtUtc = DateTime.UtcNow,
                 IsActive = true
             };
             dbContext.Alerts.Add(alert);

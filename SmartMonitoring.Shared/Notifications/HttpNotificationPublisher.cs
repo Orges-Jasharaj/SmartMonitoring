@@ -23,6 +23,7 @@ public class HttpNotificationPublisher(
                 "Notification publish failed with status {StatusCode} for alert {AlertId}",
                 response.StatusCode,
                 request.AlertId);
+            response.EnsureSuccessStatusCode();
         }
     }
 }

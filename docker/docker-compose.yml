@@ -103,7 +103,7 @@ services:
       Notification__Enabled: "true"
       Notification__BaseUrl: http://notification-service:8083
       Notification__ApiKey: dev-notification-api-key-change-in-production
-      Alert__ActiveAlertReminderMinutes: "15"
+      Alert__ActiveAlertReminderMinutes: "1"
       Identity__BaseUrl: http://identity-service:8080
     depends_on:
       - sqlserver

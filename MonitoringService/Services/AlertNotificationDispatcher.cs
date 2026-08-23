@@ -1,3 +1,4 @@
+using MonitoringService.Constants;
 using MonitoringService.Data;
 using MonitoringService.Data.Models;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,8 @@ public class AlertNotificationDispatcher(
             return;
         }
 
+        var anyNotified = false;
+
         foreach (var alert in alerts)
         {
             var request = new AlertNotificationRequest
@@ -58,11 +61,22 @@ public class AlertNotificationDispatcher(
             try
             {
                 await notificationPublisher.PublishAlertAsync(request, cancellationToken);
+
+                if (alert.AlertType == AlertTypes.TemperatureOutOfRange)
+                {
+                    alert.LastNotifiedAtUtc = DateTime.UtcNow;
+                    anyNotified = true;
+                }
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Failed to publish notification for alert {AlertId}", alert.Id);
             }
+        }
+
+        if (anyNotified)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }
