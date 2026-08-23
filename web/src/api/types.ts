@@ -81,3 +81,34 @@ export type CompanySummary = {
   devicesOk: number;
   devicesAlerting: number;
 };
+
+export type RegisterResponse = {
+  id: string;
+  userName: string;
+  email: string;
+  createdAt: string;
+  emailConfirmationRequired: boolean;
+};
+
+export type AuditLog = {
+  id: string;
+  serviceName: string;
+  eventType: string;
+  outcome: string;
+  actorUserId?: string | null;
+  actorUserName?: string | null;
+  targetEntityType?: string | null;
+  targetEntityId?: string | null;
+  targetUserName?: string | null;
+  detail?: string | null;
+  correlationId?: string | null;
+  ipAddress?: string | null;
+  occurredAtUtc: string;
+};
+
+export type PagedAuditLogs = {
+  items: AuditLog[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+};

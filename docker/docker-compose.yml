@@ -154,6 +154,9 @@ services:
       Observability__OtlpEndpoint: http://tempo:4317
       Observability__RestrictMetricsToLocalhost: "false"
       AuditApiKey__ApiKey: dev-audit-api-key-change-in-production
+      Jwt__Key: "DockerDevJwtKey-MustBeAtLeast32CharactersLong!"
+      Jwt__Issuer: SmartMonitoring.Identity
+      Jwt__Audience: SmartMonitoring.Clients
     depends_on:
       - sqlserver
       - loki

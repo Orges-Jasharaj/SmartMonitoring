@@ -8,6 +8,7 @@ export default defineConfig({
     proxy: {
       '/identity': { target: 'http://localhost:8088', changeOrigin: true },
       '/monitoring': { target: 'http://localhost:8088', changeOrigin: true },
+      '/audit': { target: 'http://localhost:8088', changeOrigin: true },
     },
   },
 });

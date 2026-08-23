@@ -1,6 +1,7 @@
 using AuditLogging.Features.GetAudits;
 using AuditLogging.Features.RecordAudit;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartMonitoring.Shared.Audit;
 
@@ -23,6 +24,7 @@ public class AuditController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? serviceName,
         [FromQuery] string? eventType,

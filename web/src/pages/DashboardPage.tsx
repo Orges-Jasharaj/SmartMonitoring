@@ -8,7 +8,7 @@ import { useAuth } from '../auth/AuthContext';
 import { getDeviceStatus } from '../utils/monitoring';
 
 export function DashboardPage() {
-  const { token } = useAuth();
+  const { token, isAdmin } = useAuth();
   const { pushToast } = useToast();
   const [summaries, setSummaries] = useState<CompanySummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,9 +85,14 @@ export function DashboardPage() {
         <StatCard label="Active alerts" value={totals.alerts} tone={totals.alerts > 0 ? 'danger' : 'ok'} />
       </div>
 
-      <div className="grid two-col">
+      <div className={`grid ${isAdmin ? 'two-col' : 'single-col'}`}>
         <div className="card stack">
-          <h2>Companies</h2>
+          <div className="panel-header">
+            <h2>Companies</h2>
+            {!loading && summaries.length > 0 && (
+              <span className="muted small">{summaries.length} tenant{summaries.length === 1 ? '' : 's'}</span>
+            )}
+          </div>
           {loading && <p className="muted">Loading…</p>}
           {error && <p className="error-banner">{error}</p>}
           {!loading && summaries.length === 0 && (
@@ -111,21 +116,23 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <form className="card stack" onSubmit={handleCreate}>
-          <h2>Create company</h2>
-          <p className="muted">System administrators can register a new tenant.</p>
-          <label>
-            Company name
-            <input
-              value={newCompanyName}
-              onChange={(e) => setNewCompanyName(e.target.value)}
-              placeholder="e.g. City Pharmacy"
-            />
-          </label>
-          <button type="submit" className="btn btn-secondary" disabled={creating || !newCompanyName.trim()}>
-            {creating ? 'Creating…' : 'Create company'}
-          </button>
-        </form>
+        {isAdmin && (
+          <form className="card stack highlight" onSubmit={handleCreate}>
+            <h2>Create company</h2>
+            <p className="muted">Register a new tenant organization.</p>
+            <label>
+              Company name
+              <input
+                value={newCompanyName}
+                onChange={(e) => setNewCompanyName(e.target.value)}
+                placeholder="e.g. City Pharmacy"
+              />
+            </label>
+            <button type="submit" className="btn btn-primary" disabled={creating || !newCompanyName.trim()}>
+              {creating ? 'Creating…' : 'Create company'}
+            </button>
+          </form>
+        )}
       </div>
     </section>
   );

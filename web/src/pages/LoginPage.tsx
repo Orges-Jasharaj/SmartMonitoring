@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { AuthFooterLink, AuthShell } from '../components/AuthShell';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 
@@ -36,22 +37,25 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-page">
-      <form className="login-card card" onSubmit={handleSubmit}>
-        <div className="brand compact">
-          <span className="brand-mark" aria-hidden="true" />
-          <div>
-            <strong>SmartMonitoring</strong>
-            <span>Sign in to your dashboard</span>
-          </div>
-        </div>
-
+    <AuthShell
+      title="Sign in"
+      subtitle="Access your monitoring dashboard"
+      footer={
+        <p className="muted small auth-footer-text">
+          No account? <AuthFooterLink to="/register">Create one</AuthFooterLink>
+          {' · '}
+          <AuthFooterLink to="/forgot-password">Forgot password?</AuthFooterLink>
+        </p>
+      }
+    >
+      <form className="stack auth-form" onSubmit={handleSubmit}>
         <label>
           Username or email
           <input
             value={userNameOrEmail}
             onChange={(e) => setUserNameOrEmail(e.target.value)}
             autoComplete="username"
+            placeholder="you@company.com"
             required
           />
         </label>
@@ -63,16 +67,17 @@ export function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
+            placeholder="••••••••"
             required
           />
         </label>
 
         {error && <p className="error-banner">{error}</p>}
 
-        <button type="submit" className="btn btn-primary" disabled={loading}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-    </div>
+    </AuthShell>
   );
 }

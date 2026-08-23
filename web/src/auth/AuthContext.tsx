@@ -6,12 +6,17 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { isAdmin, parseJwt } from '../utils/jwt';
 
 const TOKEN_KEY = 'sm_token';
 const EXPIRES_KEY = 'sm_token_expires';
 
 type AuthContextValue = {
   token: string | null;
+  userId: string | null;
+  userName: string | null;
+  roles: string[];
+  isAdmin: boolean;
   isAuthenticated: boolean;
   login: (token: string, expiresAt: string) => void;
   logout: () => void;
@@ -35,8 +40,22 @@ function readStoredToken(): string | null {
   return token;
 }
 
+function sessionFromToken(token: string | null) {
+  if (!token) {
+    return { userId: null, userName: null, roles: [] as string[] };
+  }
+
+  const payload = parseJwt(token);
+  return {
+    userId: payload?.userId ?? null,
+    userName: payload?.userName ?? null,
+    roles: payload?.roles ?? [],
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => readStoredToken());
+  const session = useMemo(() => sessionFromToken(token), [token]);
 
   const login = useCallback((nextToken: string, expiresAt: string) => {
     localStorage.setItem(TOKEN_KEY, nextToken);
@@ -53,11 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       token,
+      userId: session.userId,
+      userName: session.userName,
+      roles: session.roles,
+      isAdmin: isAdmin(session.roles),
       isAuthenticated: token !== null,
       login,
       logout,
     }),
-    [token, login, logout],
+    [token, session, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
