@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="MonitoringService/MonitoringService.csproj" />
   <Project Path="ApiGateway/ApiGateway.csproj" />
   <Project Path="AuditLogging/AuditLogging.csproj" />
   <Project Path="IdentityService/IdentityService.csproj" />

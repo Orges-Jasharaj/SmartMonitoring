@@ -68,11 +68,41 @@ services:
       Observability__RestrictMetricsToLocalhost: "false"
       ReverseProxy__Clusters__identity-cluster__Destinations__destination1__Address: http://identity-service:8080/
       ReverseProxy__Clusters__audit-cluster__Destinations__destination1__Address: http://audit-logging:8081/
+      ReverseProxy__Clusters__monitoring-cluster__Destinations__destination1__Address: http://monitoring-service:8082/
     depends_on:
       - identity-service
       - audit-logging
+      - monitoring-service
       - loki
       - tempo
+
+  monitoring-service:
+    build:
+      context: ..
+      dockerfile: MonitoringService/Dockerfile
+    restart: on-failure
+    ports:
+      - "8082:8082"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DisableHttpsRedirection: "true"
+      Database__RunMigrationsOnStartup: "true"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=SmartMonitoringMonitoringDb;User Id=sa;Password=SmartMonitoring@123;TrustServerCertificate=True;"
+      Jwt__Key: "DockerDevJwtKey-MustBeAtLeast32CharactersLong!"
+      Jwt__Issuer: SmartMonitoring.Identity
+      Jwt__Audience: SmartMonitoring.Clients
+      Observability__LokiUrl: http://loki:3100
+      Observability__OtlpEndpoint: http://tempo:4317
+      Observability__RestrictMetricsToLocalhost: "false"
+      Audit__Enabled: "true"
+      Audit__ServiceName: MonitoringService
+      Audit__BaseUrl: http://audit-logging:8081
+      Audit__ApiKey: dev-audit-api-key-change-in-production
+    depends_on:
+      - sqlserver
+      - loki
+      - tempo
+      - audit-logging
 
   audit-logging:
     build:
