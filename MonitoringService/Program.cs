@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using SmartMonitoring.Shared.Audit;
+using SmartMonitoring.Shared.Notifications;
 using SmartMonitoring.Shared.Observability;
 using System.Text;
 
@@ -19,11 +20,21 @@ try
 
     builder.AddObservability();
     builder.Services.AddAuditPublishing(builder.Configuration);
+    builder.Services.AddNotificationPublishing(builder.Configuration);
+    builder.Services.Configure<AlertOptions>(builder.Configuration.GetSection(AlertOptions.SectionName));
+
+    builder.Services.Configure<IdentityOptions>(builder.Configuration.GetSection(IdentityOptions.SectionName));
+    builder.Services.AddHttpClient<IIdentityUserEmailResolver, IdentityUserEmailResolver>((serviceProvider, client) =>
+    {
+        var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<IdentityOptions>>().Value;
+        client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+    });
 
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ICurrentUserContext, CurrentUserContext>();
     builder.Services.AddScoped<ICompanyAccessService, CompanyAccessService>();
     builder.Services.AddScoped<IAlertEvaluator, AlertEvaluator>();
+    builder.Services.AddScoped<IAlertNotificationDispatcher, AlertNotificationDispatcher>();
 
     builder.Services.AddControllers();
     builder.Services.AddSwaggerGen(c =>

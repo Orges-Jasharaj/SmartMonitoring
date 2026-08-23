@@ -69,10 +69,12 @@ services:
       ReverseProxy__Clusters__identity-cluster__Destinations__destination1__Address: http://identity-service:8080/
       ReverseProxy__Clusters__audit-cluster__Destinations__destination1__Address: http://audit-logging:8081/
       ReverseProxy__Clusters__monitoring-cluster__Destinations__destination1__Address: http://monitoring-service:8082/
+      ReverseProxy__Clusters__notification-cluster__Destinations__destination1__Address: http://notification-service:8083/
     depends_on:
       - identity-service
       - audit-logging
       - monitoring-service
+      - notification-service
       - loki
       - tempo
 
@@ -98,11 +100,43 @@ services:
       Audit__ServiceName: MonitoringService
       Audit__BaseUrl: http://audit-logging:8081
       Audit__ApiKey: dev-audit-api-key-change-in-production
+      Notification__Enabled: "true"
+      Notification__BaseUrl: http://notification-service:8083
+      Notification__ApiKey: dev-notification-api-key-change-in-production
+      Alert__ActiveAlertReminderMinutes: "15"
+      Identity__BaseUrl: http://identity-service:8080
     depends_on:
       - sqlserver
       - loki
       - tempo
       - audit-logging
+      - notification-service
+      - identity-service
+
+  notification-service:
+    build:
+      context: ..
+      dockerfile: NotificationService/Dockerfile
+    restart: on-failure
+    ports:
+      - "8083:8083"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DisableHttpsRedirection: "true"
+      Observability__LokiUrl: http://loki:3100
+      Observability__OtlpEndpoint: http://tempo:4317
+      Observability__RestrictMetricsToLocalhost: "false"
+      NotificationApiKey__ApiKey: dev-notification-api-key-change-in-production
+      Email__Enabled: "true"
+      Email__Host: mailpit
+      Email__Port: "1025"
+      Email__UseSsl: "false"
+      Email__FromAddress: alerts@smartmonitoring.local
+      Email__FromName: SmartMonitoring Alerts
+    depends_on:
+      - mailpit
+      - loki
+      - tempo
 
   audit-logging:
     build:

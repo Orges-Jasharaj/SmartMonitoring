@@ -10,6 +10,7 @@ public class Alert
     public decimal? TemperatureC { get; set; }
     public DateTime TriggeredAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? ResolvedAtUtc { get; set; }
+    public DateTime? LastNotifiedAtUtc { get; set; }
     public bool IsActive { get; set; } = true;
 
     public Device Device { get; set; } = null!;
