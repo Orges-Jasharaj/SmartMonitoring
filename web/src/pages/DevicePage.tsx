@@ -20,6 +20,7 @@ export function DevicePage() {
   const [simulating, setSimulating] = useState(false);
   const refresh = useCallback(async () => {
     if (!token || !companyId || !deviceId) return;
+    setError(null);
 
     const [deviceRes, readingsRes] = await Promise.all([
       api.getDevice(token, deviceId),
@@ -29,6 +30,7 @@ export function DevicePage() {
     if (deviceRes.success && deviceRes.data) {
       setDevice(deviceRes.data);
     } else {
+      setDevice(null);
       setError(deviceRes.message ?? 'Device not found');
     }
 
@@ -61,8 +63,17 @@ export function DevicePage() {
     await refresh();
   }
 
+  if (!device && !error) {
+    return <p className="muted page-loading">Loading device…</p>;
+  }
+
   if (!device) {
-    return <p className="muted page-loading">{error ?? 'Loading device…'}</p>;
+    return (
+      <section className="stack">
+        <Link to={`/companies/${companyId}`} className="back-link">← Back to company</Link>
+        <p className="error-banner">{error ?? 'Device not found'}</p>
+      </section>
+    );
   }
 
   const status = getDeviceStatus(device, readings);

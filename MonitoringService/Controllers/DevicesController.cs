@@ -37,7 +37,7 @@ public class DevicesController(IMediator mediator) : ControllerBase
 }
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/devices")]
 [Authorize]
 public class DeviceDetailsController(IMediator mediator) : ControllerBase
 {
