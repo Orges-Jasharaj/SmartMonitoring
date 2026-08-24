@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Company, CompanySummary } from '../api/types';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
+import { useMonitoringHub } from '../hooks/useMonitoringHub';
 import { getDeviceStatus } from '../utils/monitoring';
 
 export function DashboardPage() {
@@ -15,8 +16,9 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [creating, setCreating] = useState(false);
+  const refreshTimerRef = useRef<number | null>(null);
 
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
@@ -34,11 +36,35 @@ export function DashboardPage() {
 
     setSummaries(enriched);
     setLoading(false);
-  }
+  }, [token]);
 
   useEffect(() => {
     void loadDashboard();
-  }, [token]);
+  }, [loadDashboard]);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      window.clearTimeout(refreshTimerRef.current);
+    }
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      void loadDashboard();
+    }, 400);
+  }, [loadDashboard]);
+
+  useMonitoringHub({
+    onReading: scheduleRefresh,
+    onAlert: scheduleRefresh,
+  });
+
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+    },
+    [],
+  );
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();

@@ -1,8 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useMonitoringConnection } from '../hooks/useMonitoringConnection';
 
 export function Layout() {
   const { logout, userName, isAdmin } = useAuth();
+  const live = useMonitoringConnection();
   const initials = (userName ?? '?').slice(0, 2).toUpperCase();
 
   return (
@@ -31,6 +33,7 @@ export function Layout() {
         </nav>
 
         <div className="topbar-user">
+          {live && <span className="live-pill">Live</span>}
           <div className="user-pill" title={userName ?? undefined}>
             <span className="user-avatar">{initials}</span>
             {userName && <span className="user-name">{userName}</span>}

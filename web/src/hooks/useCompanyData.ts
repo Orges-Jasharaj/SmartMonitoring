@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Alert, Company, CompanyUser, Device, Reading, User } from '../api/types';
+import { useMonitoringHub } from './useMonitoringHub';
+import {
+  mergeAlertState,
+  prependReading,
+  updateDeviceLastReading,
+} from '../realtime/monitoringHub';
 import { getDeviceStatus } from '../utils/monitoring';
 
 type CompanyData = {
@@ -74,6 +80,40 @@ export function useCompanyData(companyId: string, token: string | null) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const handleReading = useCallback(
+    (reading: Reading) => {
+      if (reading.companyId !== companyId) return;
+      setData((current) => ({
+        ...current,
+        readings: prependReading(current.readings, reading),
+        devices: updateDeviceLastReading(current.devices, reading.deviceId, reading.measuredAtUtc),
+        lastUpdated: new Date(),
+      }));
+    },
+    [companyId],
+  );
+
+  const handleAlert = useCallback(
+    (alert: Alert) => {
+      if (alert.companyId !== companyId) return;
+      setData((current) => {
+        const nextAlerts = mergeAlertState(current.alerts, current.alertHistory, alert);
+        return {
+          ...current,
+          ...nextAlerts,
+          lastUpdated: new Date(),
+        };
+      });
+    },
+    [companyId],
+  );
+
+  useMonitoringHub({
+    companyId,
+    onReading: handleReading,
+    onAlert: handleAlert,
+  });
 
   const devicesOk = data.devices.filter(
     (device) => getDeviceStatus(device, data.readings).tone === 'ok',

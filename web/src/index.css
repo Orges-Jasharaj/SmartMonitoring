@@ -473,6 +473,26 @@ select:focus {
   white-space: nowrap;
 }
 
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #86efac;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.live-pill::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.75);
+}
+
 .company-list {
   list-style: none;
   padding: 0;

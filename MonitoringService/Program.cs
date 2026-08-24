@@ -1,4 +1,5 @@
 using MonitoringService.Data;
+using MonitoringService.Hubs;
 using MonitoringService.Services;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -35,7 +36,9 @@ try
     builder.Services.AddScoped<ICompanyAccessService, CompanyAccessService>();
     builder.Services.AddScoped<IAlertEvaluator, AlertEvaluator>();
     builder.Services.AddScoped<IAlertNotificationDispatcher, AlertNotificationDispatcher>();
+    builder.Services.AddSingleton<IRealtimeNotifier, RealtimeNotifier>();
 
+    builder.Services.AddSignalR();
     builder.Services.AddControllers();
     builder.Services.AddSwaggerGen(c =>
     {
@@ -88,6 +91,20 @@ try
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
                 ClockSkew = TimeSpan.Zero
             };
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    var path = context.HttpContext.Request.Path;
+                    if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    {
+                        context.Token = accessToken;
+                    }
+
+                    return Task.CompletedTask;
+                }
+            };
         });
 
     builder.Services.AddAuthorization();
@@ -118,6 +135,7 @@ try
 
     app.MapHealthChecks("/health");
     app.MapControllers();
+    app.MapHub<MonitoringHub>("/hubs/monitoring");
 
     using (var scope = app.Services.CreateScope())
     {

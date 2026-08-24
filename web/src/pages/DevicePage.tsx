@@ -6,6 +6,8 @@ import { TemperatureChart } from '../components/TemperatureChart';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
+import { useMonitoringHub } from '../hooks/useMonitoringHub';
+import { prependReading } from '../realtime/monitoringHub';
 import { formatDateTime, getDeviceStatus } from '../utils/monitoring';
 
 export function DevicePage() {
@@ -43,6 +45,20 @@ export function DevicePage() {
     void refresh();
   }, [refresh]);
 
+  const handleReading = useCallback(
+    (reading: Reading) => {
+      setReadings((current) => prependReading(current, reading));
+      setDevice((current) =>
+        current && current.id === reading.deviceId
+          ? { ...current, lastReadingAtUtc: reading.measuredAtUtc }
+          : current,
+      );
+    },
+    [],
+  );
+
+  useMonitoringHub({ companyId, deviceId, onReading: handleReading });
+
   async function handleSimulateReading(event: FormEvent) {
     event.preventDefault();
     if (!deviceKey.trim()) {
@@ -60,7 +76,6 @@ export function DevicePage() {
     }
 
     pushToast(`Reading ${simulateTemp}°C ingested`, 'success');
-    await refresh();
   }
 
   if (!device && !error) {

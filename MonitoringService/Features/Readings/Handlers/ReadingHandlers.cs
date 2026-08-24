@@ -14,6 +14,7 @@ public class IngestReadingHandler(
     MonitoringDbContext dbContext,
     IAlertEvaluator alertEvaluator,
     IAlertNotificationDispatcher alertNotificationDispatcher,
+    IRealtimeNotifier realtimeNotifier,
     IAuditRecorder auditRecorder) : IRequestHandler<IngestReadingCommand, ResponseDto<ReadingDto>>
 {
     public async Task<ResponseDto<ReadingDto>> Handle(IngestReadingCommand request, CancellationToken cancellationToken)
@@ -49,6 +50,10 @@ public class IngestReadingHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
         await alertNotificationDispatcher.DispatchAsync(device, alertsToNotify, cancellationToken);
 
+        var readingDto = Map(reading);
+        await realtimeNotifier.NotifyReadingAsync(readingDto, cancellationToken);
+        await realtimeNotifier.NotifyAlertsAsync(device.CompanyId, alertsToNotify, cancellationToken);
+
         await auditRecorder.RecordAsync(
             "ReadingIngested",
             "Success",
@@ -57,7 +62,7 @@ public class IngestReadingHandler(
             detail: $"{request.TemperatureC}C",
             cancellationToken: cancellationToken);
 
-        return ResponseDto<ReadingDto>.SuccessResponse(Map(reading), "Reading recorded");
+        return ResponseDto<ReadingDto>.SuccessResponse(readingDto, "Reading recorded");
     }
 
     internal static ReadingDto Map(TemperatureReading reading) => new()
