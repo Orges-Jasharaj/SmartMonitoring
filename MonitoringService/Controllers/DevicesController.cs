@@ -34,6 +34,20 @@ public class DevicesController(IMediator mediator) : ControllerBase
         if (!response.Success) return BadRequest(response);
         return Ok(response);
     }
+
+    [HttpDelete("{deviceId:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(Guid companyId, Guid deviceId)
+    {
+        var response = await mediator.Send(new DeleteDeviceCommand
+        {
+            CompanyId = companyId,
+            DeviceId = deviceId
+        });
+
+        if (!response.Success) return BadRequest(response);
+        return Ok(response);
+    }
 }
 
 [ApiController]

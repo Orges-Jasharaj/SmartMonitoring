@@ -12,6 +12,12 @@ public class CreateDeviceCommand : IRequest<ResponseDto<DeviceCreatedDto>>
     public decimal MaxTempC { get; set; }
 }
 
+public class DeleteDeviceCommand : IRequest<ResponseDto<bool>>
+{
+    public Guid CompanyId { get; set; }
+    public Guid DeviceId { get; set; }
+}
+
 public class DeviceDto
 {
     public Guid Id { get; set; }

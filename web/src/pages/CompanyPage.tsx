@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Device, DeviceCreated, Reading } from '../api/types';
 import { StatCard } from '../components/StatCard';
@@ -11,14 +11,29 @@ import { copyToClipboard, formatDateTime, getDeviceStatus } from '../utils/monit
 
 type Tab = 'overview' | 'devices' | 'readings' | 'alerts' | 'team';
 
+const VALID_TABS: Tab[] = ['overview', 'devices', 'readings', 'alerts', 'team'];
+
+function parseTab(value: string | null): Tab {
+  if (value && VALID_TABS.includes(value as Tab)) {
+    return value as Tab;
+  }
+  return 'overview';
+}
+
 export function CompanyPage() {
   const { companyId = '' } = useParams();
-  const { token } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { token, isAdmin } = useAuth();
   const { pushToast } = useToast();
   const { company, devices, alerts, alertHistory, readings, members, users, loading, error, lastUpdated, refresh, stats } =
     useCompanyData(companyId, token);
 
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(() => parseTab(searchParams.get('tab')));
+
+  useEffect(() => {
+    setTab(parseTab(searchParams.get('tab')));
+  }, [searchParams]);
+
   const [showHistory, setShowHistory] = useState(false);
   const [readingDeviceFilter, setReadingDeviceFilter] = useState('');
   const [createdDevice, setCreatedDevice] = useState<DeviceCreated | null>(null);
@@ -66,6 +81,22 @@ export function CompanyPage() {
   async function handleCopyKey(key: string) {
     await copyToClipboard(key);
     pushToast('Device key copied to clipboard', 'success');
+  }
+
+  async function handleDeleteDevice(device: Device) {
+    if (!token || !companyId) return;
+    if (!window.confirm(`Delete device "${device.name}"? This also removes its readings and alerts.`)) {
+      return;
+    }
+
+    const response = await api.deleteDevice(token, companyId, device.id);
+    if (!response.success) {
+      pushToast(response.message ?? 'Failed to delete device', 'error');
+      return;
+    }
+
+    pushToast(`Device "${device.name}" deleted`, 'success');
+    await refresh();
   }
 
   function deviceName(deviceId: string) {
@@ -181,7 +212,14 @@ export function CompanyPage() {
             <h2>Devices</h2>
             <div className="device-grid">
               {devices.map((device) => (
-                <DeviceCard key={device.id} device={device} companyId={companyId} readings={readings} />
+                <DeviceCard
+                  key={device.id}
+                  device={device}
+                  companyId={companyId}
+                  readings={readings}
+                  isAdmin={isAdmin}
+                  onDelete={() => void handleDeleteDevice(device)}
+                />
               ))}
             </div>
           </div>
@@ -332,18 +370,37 @@ export function CompanyPage() {
   );
 }
 
-function DeviceCard({ device, companyId, readings }: { device: Device; companyId: string; readings: Reading[] }) {
+function DeviceCard({
+  device,
+  companyId,
+  readings,
+  isAdmin,
+  onDelete,
+}: {
+  device: Device;
+  companyId: string;
+  readings: Reading[];
+  isAdmin?: boolean;
+  onDelete?: () => void;
+}) {
   const status = getDeviceStatus(device, readings);
   return (
-    <Link to={`/companies/${companyId}/devices/${device.id}`} className="device-card link-card">
-      <div className="device-card-header">
-        <strong>{device.name}</strong>
-        <span className={`pill pill-${status.tone}`}>{status.label}</span>
-      </div>
-      <p className="muted">{device.zoneName}</p>
-      <p>Range: {device.minTempC}°C – {device.maxTempC}°C</p>
-      {status.latestTemp !== undefined && <p className="temp-reading">{status.latestTemp}°C</p>}
-      <p className="muted small">Last: {formatDateTime(device.lastReadingAtUtc)}</p>
-    </Link>
+    <div className="device-card">
+      <Link to={`/companies/${companyId}/devices/${device.id}`} className="device-card-body link-card">
+        <div className="device-card-header">
+          <strong>{device.name}</strong>
+          <span className={`pill pill-${status.tone}`}>{status.label}</span>
+        </div>
+        <p className="muted">{device.zoneName}</p>
+        <p>Range: {device.minTempC}°C – {device.maxTempC}°C</p>
+        {status.latestTemp !== undefined && <p className="temp-reading">{status.latestTemp}°C</p>}
+        <p className="muted small">Last: {formatDateTime(device.lastReadingAtUtc)}</p>
+      </Link>
+      {isAdmin && onDelete && (
+        <button type="button" className="btn btn-ghost btn-sm device-delete-btn" onClick={onDelete}>
+          Delete
+        </button>
+      )}
+    </div>
   );
 }

@@ -1,0 +1,99 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { useAlertNotifications } from '../hooks/useAlertNotifications';
+import { formatDateTime } from '../utils/monitoring';
+
+function BellIcon() {
+  return (
+    <svg className="notification-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 2a5 5 0 0 0-5 5v2.1c0 .5-.2 1-.5 1.4L5.1 12.8A1 1 0 0 0 6 14.5h12a1 1 0 0 0 .9-1.4l-1.4-2.3c-.3-.4-.5-.9-.5-1.4V7a5 5 0 0 0-5-5Zm0 20a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+export function AlertNotificationBell() {
+  const { token } = useAuth();
+  const { items, loading, refresh, count } = useAlertNotifications(token);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  function toggleOpen() {
+    const next = !open;
+    setOpen(next);
+    if (next) {
+      void refresh();
+    }
+  }
+
+  return (
+    <div className="notification-root" ref={rootRef}>
+      <button
+        type="button"
+        className="notification-btn"
+        onClick={toggleOpen}
+        aria-label={`Alerts${count > 0 ? `, ${count} active` : ''}`}
+        aria-expanded={open}
+      >
+        <BellIcon />
+        {count > 0 && <span className="notification-badge">{count > 99 ? '99+' : count}</span>}
+      </button>
+
+      {open && (
+        <div className="notification-panel card">
+          <div className="notification-panel-header">
+            <strong>Active alerts</strong>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void refresh()}>
+              Refresh
+            </button>
+          </div>
+
+          {loading && items.length === 0 && <p className="muted small notification-empty">Loading…</p>}
+
+          {!loading && items.length === 0 && (
+            <p className="muted small notification-empty">No active alerts right now.</p>
+          )}
+
+          <ul className="notification-list">
+            {items.map(({ alert, companyId, companyName, deviceName }) => (
+              <li key={alert.id}>
+                <Link
+                  to={`/companies/${companyId}?tab=alerts`}
+                  className="notification-item"
+                  onClick={() => setOpen(false)}
+                >
+                  <div className="notification-item-top">
+                    <strong>{deviceName}</strong>
+                    <span className="pill pill-danger">Alert</span>
+                  </div>
+                  <p className="muted small">{companyName}</p>
+                  <p className="small">{alert.message}</p>
+                  {alert.temperatureC != null && (
+                    <p className="small danger-text">{alert.temperatureC}°C</p>
+                  )}
+                  <p className="muted small">{formatDateTime(alert.triggeredAtUtc)}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

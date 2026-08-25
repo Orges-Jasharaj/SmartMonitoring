@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Device, Reading } from '../api/types';
 import { TemperatureChart } from '../components/TemperatureChart';
@@ -12,7 +12,8 @@ import { formatDateTime, getDeviceStatus } from '../utils/monitoring';
 
 export function DevicePage() {
   const { companyId = '', deviceId = '' } = useParams();
-  const { token } = useAuth();
+  const navigate = useNavigate();
+  const { token, isAdmin } = useAuth();
   const { pushToast } = useToast();
   const [device, setDevice] = useState<Device | null>(null);
   const [readings, setReadings] = useState<Reading[]>([]);
@@ -59,6 +60,22 @@ export function DevicePage() {
 
   useMonitoringHub({ companyId, deviceId, onReading: handleReading });
 
+  async function handleDeleteDevice() {
+    if (!token || !companyId || !deviceId || !device) return;
+    if (!window.confirm(`Delete device "${device.name}"? This also removes its readings and alerts.`)) {
+      return;
+    }
+
+    const response = await api.deleteDevice(token, companyId, deviceId);
+    if (!response.success) {
+      pushToast(response.message ?? 'Failed to delete device', 'error');
+      return;
+    }
+
+    pushToast(`Device "${device.name}" deleted`, 'success');
+    navigate(`/companies/${companyId}`);
+  }
+
   async function handleSimulateReading(event: FormEvent) {
     event.preventDefault();
     if (!deviceKey.trim()) {
@@ -102,6 +119,11 @@ export function DevicePage() {
           <p className="muted">{device.zoneName} · Safe range {device.minTempC}°C – {device.maxTempC}°C</p>
         </div>
         <div className="header-actions">
+          {isAdmin && (
+            <button type="button" className="btn btn-ghost" onClick={() => void handleDeleteDevice()}>
+              Delete device
+            </button>
+          )}
           <button type="button" className="btn btn-ghost" onClick={() => void refresh()}>Refresh</button>
         </div>
       </div>

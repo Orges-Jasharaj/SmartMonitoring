@@ -128,6 +128,13 @@ export const api = {
     });
   },
 
+  deleteDevice(token: string, companyId: string, deviceId: string) {
+    return request<boolean>(`/monitoring/api/companies/${companyId}/devices/${deviceId}`, {
+      method: 'DELETE',
+      token,
+    });
+  },
+
   getAlerts(token: string, companyId: string, activeOnly = true) {
     const query = activeOnly ? '?activeOnly=true' : '?activeOnly=false';
     return request<Alert[]>(`/monitoring/api/companies/${companyId}/alerts${query}`, { token });

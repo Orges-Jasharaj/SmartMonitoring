@@ -131,3 +131,40 @@ public class GetDeviceByIdHandler(
         return ResponseDto<DeviceDto>.SuccessResponse(CreateDeviceHandler.Map(device));
     }
 }
+
+public class DeleteDeviceHandler(
+    MonitoringDbContext dbContext,
+    ICurrentUserContext currentUser,
+    IAuditRecorder auditRecorder) : IRequestHandler<DeleteDeviceCommand, ResponseDto<bool>>
+{
+    public async Task<ResponseDto<bool>> Handle(DeleteDeviceCommand request, CancellationToken cancellationToken)
+    {
+        if (!currentUser.IsSystemAdmin)
+        {
+            return ResponseDto<bool>.Failure("Only system administrators can delete devices.");
+        }
+
+        var device = await dbContext.Devices
+            .FirstOrDefaultAsync(d => d.Id == request.DeviceId && d.CompanyId == request.CompanyId, cancellationToken);
+
+        if (device == null)
+        {
+            return ResponseDto<bool>.Failure("Device not found.");
+        }
+
+        var deviceName = device.Name;
+        dbContext.Devices.Remove(device);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditRecorder.RecordAsync(
+            "DeviceDeleted",
+            "Success",
+            actorUserId: currentUser.UserId,
+            targetEntityType: "Device",
+            targetEntityId: request.DeviceId.ToString(),
+            detail: deviceName,
+            cancellationToken: cancellationToken);
+
+        return ResponseDto<bool>.SuccessResponse(true, "Device deleted.");
+    }
+}

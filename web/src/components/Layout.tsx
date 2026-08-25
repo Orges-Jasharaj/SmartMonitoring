@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { AlertNotificationBell } from './AlertNotificationBell';
 import { useAuth } from '../auth/AuthContext';
 import { useMonitoringConnection } from '../hooks/useMonitoringConnection';
 
@@ -34,6 +35,7 @@ export function Layout() {
 
         <div className="topbar-user">
           {live && <span className="live-pill">Live</span>}
+          <AlertNotificationBell />
           <div className="user-pill" title={userName ?? undefined}>
             <span className="user-avatar">{initials}</span>
             {userName && <span className="user-name">{userName}</span>}
