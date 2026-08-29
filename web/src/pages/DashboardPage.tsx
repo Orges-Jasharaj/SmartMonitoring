@@ -126,7 +126,11 @@ export function DashboardPage() {
           )}
           <div className="company-grid">
             {summaries.map(({ company, deviceCount, activeAlerts, devicesOk, devicesAlerting }) => (
-              <Link key={company.id} to={`/companies/${company.id}`} className="company-card">
+              <Link
+                key={company.id}
+                to={`/companies/${company.id}`}
+                className={`company-card${activeAlerts > 0 ? ' company-card-alert' : ''}`}
+              >
                 <div className="company-card-top">
                   <strong>{company.name}</strong>
                   {activeAlerts > 0 && <span className="pill pill-danger">{activeAlerts} alert{activeAlerts > 1 ? 's' : ''}</span>}

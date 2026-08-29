@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Alert } from '../api/types';
+import { loadSeenAlertIds, saveSeenAlertIds } from '../utils/seenAlerts';
 import { useMonitoringHub } from './useMonitoringHub';
 
 export type AlertNotificationItem = {
@@ -10,14 +11,41 @@ export type AlertNotificationItem = {
   deviceName: string;
 };
 
-export function useAlertNotifications(token: string | null) {
+export function useAlertNotifications(
+  token: string | null,
+  userId: string | null,
+  panelOpen: boolean,
+) {
   const [items, setItems] = useState<AlertNotificationItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(token));
+  const [hasLoadedAlerts, setHasLoadedAlerts] = useState(false);
+  const [seenAlertIds, setSeenAlertIds] = useState<Set<string>>(() => loadSeenAlertIds(userId));
   const refreshTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setSeenAlertIds(loadSeenAlertIds(userId));
+  }, [userId]);
+
+  useEffect(() => {
+    setHasLoadedAlerts(false);
+  }, [token]);
+
+  const updateSeenAlertIds = useCallback(
+    (updater: (current: Set<string>) => Set<string>) => {
+      setSeenAlertIds((current) => {
+        const next = updater(current);
+        saveSeenAlertIds(userId, next);
+        return next;
+      });
+    },
+    [userId],
+  );
 
   const refresh = useCallback(async () => {
     if (!token) {
       setItems([]);
+      setHasLoadedAlerts(false);
+      setLoading(false);
       return;
     }
 
@@ -25,6 +53,7 @@ export function useAlertNotifications(token: string | null) {
     const companiesRes = await api.getCompanies(token);
     if (!companiesRes.success || !companiesRes.data) {
       setItems([]);
+      setHasLoadedAlerts(true);
       setLoading(false);
       return;
     }
@@ -55,6 +84,7 @@ export function useAlertNotifications(token: string | null) {
             new Date(b.alert.triggeredAtUtc).getTime() - new Date(a.alert.triggeredAtUtc).getTime(),
         ),
     );
+    setHasLoadedAlerts(true);
     setLoading(false);
   }, [token]);
 
@@ -83,5 +113,32 @@ export function useAlertNotifications(token: string | null) {
     [],
   );
 
-  return { items, loading, refresh, count: items.length };
+  // Drop seen IDs for alerts that are no longer active (only after alerts have loaded).
+  useEffect(() => {
+    if (!hasLoadedAlerts || loading) return;
+
+    const activeIds = new Set(items.map((item) => item.alert.id));
+    updateSeenAlertIds((current) => {
+      const next = new Set([...current].filter((id) => activeIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [items, loading, hasLoadedAlerts, updateSeenAlertIds]);
+
+  // Mark everything in the panel as seen once the user opens it and data is loaded.
+  useEffect(() => {
+    if (!panelOpen || loading) return;
+
+    updateSeenAlertIds((current) => {
+      const next = new Set(current);
+      items.forEach((item) => next.add(item.alert.id));
+      return next.size === current.size ? current : next;
+    });
+  }, [panelOpen, loading, items, updateSeenAlertIds]);
+
+  const unreadCount = useMemo(
+    () => items.filter((item) => !seenAlertIds.has(item.alert.id)).length,
+    [items, seenAlertIds],
+  );
+
+  return { items, loading, refresh, unreadCount, totalCount: items.length };
 }

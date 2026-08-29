@@ -495,6 +495,19 @@ select:focus {
 
 .notification-root {
   position: relative;
+  z-index: 60;
+}
+
+.notification-backdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(2, 6, 14, 0.72);
+  backdrop-filter: blur(2px);
+  z-index: 55;
+  cursor: default;
 }
 
 .notification-btn {
@@ -546,7 +559,11 @@ select:focus {
   max-height: min(24rem, calc(100vh - 6rem));
   overflow: auto;
   padding: 0.85rem;
-  z-index: 50;
+  z-index: 60;
+  background: #0f1629;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
 
 .notification-panel-header {
@@ -664,6 +681,15 @@ select:focus {
 .device-delete-btn:hover:not(:disabled) {
   color: #fecaca;
   border-color: rgba(248, 113, 113, 0.55);
+}
+
+.device-card-alert {
+  border: 2px solid rgba(248, 113, 113, 0.85);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.12), rgba(12, 18, 32, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(248, 113, 113, 0.25),
+    0 0 24px rgba(248, 113, 113, 0.2);
+  animation: alert-border-pulse 2.2s ease-in-out infinite;
 }
 
 .device-card-header {
@@ -877,6 +903,23 @@ th {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
 }
 
+.company-card-alert {
+  border: 2px solid rgba(248, 113, 113, 0.85);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.14), rgba(12, 18, 32, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(248, 113, 113, 0.25),
+    0 0 28px rgba(248, 113, 113, 0.22);
+  animation: alert-border-pulse 2.2s ease-in-out infinite;
+}
+
+.company-card-alert:hover {
+  border-color: #f87171;
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(248, 113, 113, 0.45),
+    0 0 36px rgba(248, 113, 113, 0.32);
+}
+
 .company-card-top,
 .company-card-stats {
   display: flex;
@@ -943,6 +986,17 @@ th {
 
 .status-row:hover {
   border-color: rgba(56, 189, 248, 0.45);
+}
+
+.status-row-alert {
+  border: 2px solid rgba(248, 113, 113, 0.85);
+  background: rgba(248, 113, 113, 0.08);
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.18);
+  animation: alert-border-pulse 2.2s ease-in-out infinite;
+}
+
+.status-row-alert:hover {
+  border-color: #f87171;
 }
 
 .status-row-meta {
@@ -1025,6 +1079,20 @@ th {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes alert-border-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(248, 113, 113, 0.25),
+      0 0 20px rgba(248, 113, 113, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(248, 113, 113, 0.5),
+      0 0 32px rgba(248, 113, 113, 0.35);
   }
 }
 

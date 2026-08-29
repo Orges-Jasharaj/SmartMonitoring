@@ -175,7 +175,10 @@ export function CompanyPage() {
                   const status = getDeviceStatus(device, readings);
                   return (
                     <li key={device.id}>
-                      <Link to={`/companies/${companyId}/devices/${device.id}`} className="status-row">
+                      <Link
+                        to={`/companies/${companyId}/devices/${device.id}`}
+                        className={`status-row${status.tone === 'danger' ? ' status-row-alert' : ''}`}
+                      >
                         <div>
                           <strong>{device.name}</strong>
                           <span className="muted small">{device.zoneName}</span>
@@ -384,8 +387,9 @@ function DeviceCard({
   onDelete?: () => void;
 }) {
   const status = getDeviceStatus(device, readings);
+  const hasAlert = status.tone === 'danger';
   return (
-    <div className="device-card">
+    <div className={`device-card${hasAlert ? ' device-card-alert' : ''}`}>
       <Link to={`/companies/${companyId}/devices/${device.id}`} className="device-card-body link-card">
         <div className="device-card-header">
           <strong>{device.name}</strong>
