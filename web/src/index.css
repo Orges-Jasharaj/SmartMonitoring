@@ -610,6 +610,15 @@ select:focus {
   margin-bottom: 0.25rem;
 }
 
+.dashboard-link-block {
+  display: block;
+  color: inherit;
+}
+
+.dashboard-link-block:hover strong {
+  color: #7dd3fc;
+}
+
 .company-list {
   list-style: none;
   padding: 0;
@@ -751,10 +760,27 @@ select:focus {
 }
 
 .alert-item {
-  border: 1px solid rgba(248, 113, 113, 0.22);
-  background: rgba(248, 113, 113, 0.06);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
   border-radius: var(--radius-sm);
   padding: 0.9rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.alert-item-active {
+  border: 2px solid rgba(248, 113, 113, 0.85);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.14), rgba(12, 18, 32, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(248, 113, 113, 0.25),
+    0 0 28px rgba(248, 113, 113, 0.22);
+  animation: alert-border-pulse 2.2s ease-in-out infinite;
+}
+
+.alert-item-active:hover {
+  border-color: #f87171;
+  box-shadow:
+    0 0 0 1px rgba(248, 113, 113, 0.45),
+    0 0 36px rgba(248, 113, 113, 0.32);
 }
 
 .alert-item > div {
@@ -880,6 +906,12 @@ th {
   flex-wrap: wrap;
 }
 
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .company-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -965,6 +997,33 @@ th {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.status-list > li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.device-row-meta {
+  padding: 0 0.75rem 0.25rem;
+}
+
+.status-row-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.status-row-wrap .status-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-row-wrap .device-delete-btn {
+  margin: 0;
+  align-self: center;
+  flex-shrink: 0;
 }
 
 .status-row,

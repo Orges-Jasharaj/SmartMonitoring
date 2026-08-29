@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Device, Reading } from '../api/types';
+import type { CompanyUser, Device, Reading } from '../api/types';
 import { TemperatureChart } from '../components/TemperatureChart';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 import { useMonitoringHub } from '../hooks/useMonitoringHub';
 import { prependReading } from '../realtime/monitoringHub';
-import { formatDateTime, getDeviceStatus } from '../utils/monitoring';
+import { canManageCompanyDevices, formatDateTime, getDeviceStatus } from '../utils/monitoring';
 
 export function DevicePage() {
   const { companyId = '', deviceId = '' } = useParams();
   const navigate = useNavigate();
-  const { token, isAdmin } = useAuth();
+  const { token, isAdmin, userId } = useAuth();
   const { pushToast } = useToast();
   const [device, setDevice] = useState<Device | null>(null);
   const [readings, setReadings] = useState<Reading[]>([]);
+  const [members, setMembers] = useState<CompanyUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [deviceKey, setDeviceKey] = useState('');
   const [simulateTemp, setSimulateTemp] = useState('6');
@@ -45,6 +46,15 @@ export function DevicePage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!token || !companyId) return;
+    void api.getCompanyUsers(token, companyId).then((response) => {
+      setMembers(response.data ?? []);
+    });
+  }, [token, companyId]);
+
+  const canManageDevices = canManageCompanyDevices(isAdmin, userId, members);
 
   const handleReading = useCallback(
     (reading: Reading) => {
@@ -119,7 +129,7 @@ export function DevicePage() {
           <p className="muted">{device.zoneName} · Safe range {device.minTempC}°C – {device.maxTempC}°C</p>
         </div>
         <div className="header-actions">
-          {isAdmin && (
+          {canManageDevices && (
             <button type="button" className="btn btn-ghost" onClick={() => void handleDeleteDevice()}>
               Delete device
             </button>

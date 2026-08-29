@@ -1,70 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Company, CompanySummary } from '../api/types';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
-import { useMonitoringHub } from '../hooks/useMonitoringHub';
-import { getDeviceStatus } from '../utils/monitoring';
+import { useGlobalMonitoring } from '../hooks/useGlobalMonitoring';
 
 export function DashboardPage() {
   const { token, isAdmin } = useAuth();
   const { pushToast } = useToast();
-  const [summaries, setSummaries] = useState<CompanySummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { summaries, loading, error, refresh, totals } = useGlobalMonitoring(token);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [creating, setCreating] = useState(false);
-  const refreshTimerRef = useRef<number | null>(null);
-
-  const loadDashboard = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    setError(null);
-
-    const companiesRes = await api.getCompanies(token);
-    if (!companiesRes.success || !companiesRes.data) {
-      setLoading(false);
-      setError(companiesRes.message ?? 'Failed to load companies');
-      return;
-    }
-
-    const enriched = await Promise.all(
-      companiesRes.data.map(async (company) => buildSummary(token, company)),
-    );
-
-    setSummaries(enriched);
-    setLoading(false);
-  }, [token]);
-
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
-
-  const scheduleRefresh = useCallback(() => {
-    if (refreshTimerRef.current) {
-      window.clearTimeout(refreshTimerRef.current);
-    }
-
-    refreshTimerRef.current = window.setTimeout(() => {
-      void loadDashboard();
-    }, 400);
-  }, [loadDashboard]);
-
-  useMonitoringHub({
-    onReading: scheduleRefresh,
-    onAlert: scheduleRefresh,
-  });
-
-  useEffect(
-    () => () => {
-      if (refreshTimerRef.current) {
-        window.clearTimeout(refreshTimerRef.current);
-      }
-    },
-    [],
-  );
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
@@ -81,26 +28,17 @@ export function DashboardPage() {
 
     setNewCompanyName('');
     pushToast(`Company "${response.data?.name}" created`, 'success');
-    await loadDashboard();
+    await refresh();
   }
-
-  const totals = summaries.reduce(
-    (acc, item) => ({
-      companies: acc.companies + 1,
-      devices: acc.devices + item.deviceCount,
-      alerts: acc.alerts + item.activeAlerts,
-    }),
-    { companies: 0, devices: 0, alerts: 0 },
-  );
 
   return (
     <section className="stack">
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p>Overview of your monitored companies, devices, and active alerts.</p>
+          <p>Overview of your monitored companies.</p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={() => void loadDashboard()}>
+        <button type="button" className="btn btn-ghost" onClick={() => void refresh()}>
           Refresh
         </button>
       </div>
@@ -111,6 +49,8 @@ export function DashboardPage() {
         <StatCard label="Active alerts" value={totals.alerts} tone={totals.alerts > 0 ? 'danger' : 'ok'} />
       </div>
 
+      {error && <p className="error-banner">{error}</p>}
+
       <div className={`grid ${isAdmin ? 'two-col' : 'single-col'}`}>
         <div className="card stack">
           <div className="panel-header">
@@ -119,8 +59,7 @@ export function DashboardPage() {
               <span className="muted small">{summaries.length} tenant{summaries.length === 1 ? '' : 's'}</span>
             )}
           </div>
-          {loading && <p className="muted">Loading…</p>}
-          {error && <p className="error-banner">{error}</p>}
+          {loading && summaries.length === 0 && <p className="muted">Loading…</p>}
           {!loading && summaries.length === 0 && (
             <p className="muted">No companies yet. Create one if you are a system admin, or ask to be assigned.</p>
           )}
@@ -133,7 +72,11 @@ export function DashboardPage() {
               >
                 <div className="company-card-top">
                   <strong>{company.name}</strong>
-                  {activeAlerts > 0 && <span className="pill pill-danger">{activeAlerts} alert{activeAlerts > 1 ? 's' : ''}</span>}
+                  {activeAlerts > 0 && (
+                    <span className="pill pill-danger">
+                      {activeAlerts} alert{activeAlerts > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="company-card-stats">
                   <span>{deviceCount} devices</span>
@@ -166,25 +109,4 @@ export function DashboardPage() {
       </div>
     </section>
   );
-}
-
-async function buildSummary(token: string, company: Company): Promise<CompanySummary> {
-  const [devicesRes, alertsRes, readingsRes] = await Promise.all([
-    api.getDevices(token, company.id),
-    api.getAlerts(token, company.id, true),
-    api.getReadings(token, company.id, undefined, 50),
-  ]);
-
-  const devices = devicesRes.data ?? [];
-  const readings = readingsRes.data ?? [];
-  const devicesOk = devices.filter((d) => getDeviceStatus(d, readings).tone === 'ok').length;
-  const devicesAlerting = devices.filter((d) => getDeviceStatus(d, readings).tone === 'danger').length;
-
-  return {
-    company,
-    deviceCount: devices.length,
-    activeAlerts: alertsRes.data?.length ?? 0,
-    devicesOk,
-    devicesAlerting,
-  };
 }

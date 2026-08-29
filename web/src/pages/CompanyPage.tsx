@@ -7,7 +7,7 @@ import { TemperatureChart } from '../components/TemperatureChart';
 import { useToast } from '../components/Toast';
 import { useCompanyData } from '../hooks/useCompanyData';
 import { useAuth } from '../auth/AuthContext';
-import { copyToClipboard, formatDateTime, getDeviceStatus } from '../utils/monitoring';
+import { canManageCompanyDevices, copyToClipboard, formatDateTime, getDeviceStatus } from '../utils/monitoring';
 
 type Tab = 'overview' | 'devices' | 'readings' | 'alerts' | 'team';
 
@@ -23,10 +23,12 @@ function parseTab(value: string | null): Tab {
 export function CompanyPage() {
   const { companyId = '' } = useParams();
   const [searchParams] = useSearchParams();
-  const { token, isAdmin } = useAuth();
+  const { token, isAdmin, userId } = useAuth();
   const { pushToast } = useToast();
   const { company, devices, alerts, alertHistory, readings, members, users, loading, error, lastUpdated, refresh, stats } =
     useCompanyData(companyId, token);
+
+  const canManageDevices = canManageCompanyDevices(isAdmin, userId, members);
 
   const [tab, setTab] = useState<Tab>(() => parseTab(searchParams.get('tab')));
 
@@ -198,7 +200,7 @@ export function CompanyPage() {
               {alerts.length === 0 && <p className="muted">No active alerts.</p>}
               <ul className="alert-list compact">
                 {alerts.slice(0, 5).map((alert) => (
-                  <li key={alert.id} className="alert-item">
+                  <li key={alert.id} className="alert-item alert-item-active">
                     <strong>{deviceName(alert.deviceId)}</strong>
                     <p className="small">{alert.message}</p>
                   </li>
@@ -220,7 +222,7 @@ export function CompanyPage() {
                   device={device}
                   companyId={companyId}
                   readings={readings}
-                  isAdmin={isAdmin}
+                  canManageDevices={canManageDevices}
                   onDelete={() => void handleDeleteDevice(device)}
                 />
               ))}
@@ -313,7 +315,7 @@ export function CompanyPage() {
           {(showHistory ? alertHistory : alerts).length === 0 && <p className="muted">No alerts to show.</p>}
           <ul className="alert-list">
             {(showHistory ? alertHistory : alerts).map((alert) => (
-              <li key={alert.id} className={`alert-item ${alert.isActive ? '' : 'resolved'}`}>
+              <li key={alert.id} className={`alert-item ${alert.isActive ? 'alert-item-active' : 'resolved'}`}>
                 <div>
                   <strong>{deviceName(alert.deviceId)}</strong>
                   <span className={`pill ${alert.isActive ? 'pill-danger' : 'pill-muted'}`}>{alert.alertType}</span>
@@ -377,13 +379,13 @@ function DeviceCard({
   device,
   companyId,
   readings,
-  isAdmin,
+  canManageDevices,
   onDelete,
 }: {
   device: Device;
   companyId: string;
   readings: Reading[];
-  isAdmin?: boolean;
+  canManageDevices?: boolean;
   onDelete?: () => void;
 }) {
   const status = getDeviceStatus(device, readings);
@@ -400,7 +402,7 @@ function DeviceCard({
         {status.latestTemp !== undefined && <p className="temp-reading">{status.latestTemp}°C</p>}
         <p className="muted small">Last: {formatDateTime(device.lastReadingAtUtc)}</p>
       </Link>
-      {isAdmin && onDelete && (
+      {canManageDevices && onDelete && (
         <button type="button" className="btn btn-ghost btn-sm device-delete-btn" onClick={onDelete}>
           Delete
         </button>

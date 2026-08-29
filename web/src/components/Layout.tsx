@@ -23,6 +23,8 @@ export function Layout() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
+          <NavLink to="/alerts">Alerts</NavLink>
+          <NavLink to="/devices">Devices</NavLink>
           {isAdmin && (
             <>
               <NavLink to="/audit">Audit</NavLink>

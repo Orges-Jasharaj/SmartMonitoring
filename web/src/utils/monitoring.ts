@@ -1,4 +1,4 @@
-import type { Device, Reading } from '../api/types';
+import type { CompanyUser, Device, Reading } from '../api/types';
 
 export type DeviceStatusTone = 'ok' | 'danger' | 'muted' | 'warning';
 
@@ -37,4 +37,21 @@ export function formatDateTime(value?: string | null) {
 
 export async function copyToClipboard(text: string) {
   await navigator.clipboard.writeText(text);
+}
+
+export function canManageCompanyDevices(
+  isSystemAdmin: boolean,
+  userId: string | null,
+  members: CompanyUser[],
+) {
+  if (isSystemAdmin) {
+    return true;
+  }
+
+  if (!userId) {
+    return false;
+  }
+
+  const normalizedUserId = userId.toLowerCase();
+  return members.some((member) => member.userId.toLowerCase() === normalizedUserId);
 }

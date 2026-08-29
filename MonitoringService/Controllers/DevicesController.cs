@@ -36,7 +36,6 @@ public class DevicesController(IMediator mediator) : ControllerBase
     }
 
     [HttpDelete("{deviceId:guid}")]
-    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid companyId, Guid deviceId)
     {
         var response = await mediator.Send(new DeleteDeviceCommand

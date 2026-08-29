@@ -5,9 +5,11 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/Toast';
 import { AuditPage } from './pages/AuditPage';
+import { AlertsPage } from './pages/AlertsPage';
 import { CompanyPage } from './pages/CompanyPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DevicePage } from './pages/DevicePage';
+import { DevicesPage } from './pages/DevicesPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -29,6 +31,8 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route index element={<DashboardPage />} />
+                <Route path="alerts" element={<AlertsPage />} />
+                <Route path="devices" element={<DevicesPage />} />
                 <Route path="companies/:companyId" element={<CompanyPage />} />
                 <Route path="companies/:companyId/devices/:deviceId" element={<DevicePage />} />
                 <Route path="profile" element={<ProfilePage />} />

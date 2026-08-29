@@ -18,7 +18,7 @@ public class CreateDeviceHandler(
 {
     public async Task<ResponseDto<DeviceCreatedDto>> Handle(CreateDeviceCommand request, CancellationToken cancellationToken)
     {
-        if (!await companyAccess.CanManageCompanyAsync(request.CompanyId, cancellationToken))
+        if (!await companyAccess.CanAccessCompanyAsync(request.CompanyId, cancellationToken))
         {
             return ResponseDto<DeviceCreatedDto>.Failure("You do not have permission to manage devices for this company.");
         }
@@ -134,14 +134,15 @@ public class GetDeviceByIdHandler(
 
 public class DeleteDeviceHandler(
     MonitoringDbContext dbContext,
+    ICompanyAccessService companyAccess,
     ICurrentUserContext currentUser,
     IAuditRecorder auditRecorder) : IRequestHandler<DeleteDeviceCommand, ResponseDto<bool>>
 {
     public async Task<ResponseDto<bool>> Handle(DeleteDeviceCommand request, CancellationToken cancellationToken)
     {
-        if (!currentUser.IsSystemAdmin)
+        if (!await companyAccess.CanAccessCompanyAsync(request.CompanyId, cancellationToken))
         {
-            return ResponseDto<bool>.Failure("Only system administrators can delete devices.");
+            return ResponseDto<bool>.Failure("You do not have permission to delete devices for this company.");
         }
 
         var device = await dbContext.Devices
