@@ -106,6 +106,9 @@ services:
       Alert__ActiveAlertReminderMinutes: "1"
       Alert__DeviceOfflineAfterMinutes: "30"
       Alert__OfflineCheckIntervalMinutes: "5"
+      ReadingRetention__Enabled: "true"
+      ReadingRetention__RetentionDays: "90"
+      ReadingRetention__CleanupIntervalHours: "24"
       Identity__BaseUrl: http://identity-service:8080
     depends_on:
       - sqlserver

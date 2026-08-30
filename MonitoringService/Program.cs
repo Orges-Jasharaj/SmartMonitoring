@@ -23,6 +23,7 @@ try
     builder.Services.AddAuditPublishing(builder.Configuration);
     builder.Services.AddNotificationPublishing(builder.Configuration);
     builder.Services.Configure<AlertOptions>(builder.Configuration.GetSection(AlertOptions.SectionName));
+    builder.Services.Configure<ReadingRetentionOptions>(builder.Configuration.GetSection(ReadingRetentionOptions.SectionName));
 
     builder.Services.Configure<IdentityOptions>(builder.Configuration.GetSection(IdentityOptions.SectionName));
     builder.Services.AddHttpClient<IIdentityUserEmailResolver, IdentityUserEmailResolver>((serviceProvider, client) =>
@@ -39,6 +40,8 @@ try
     builder.Services.AddScoped<IAlertNotificationDispatcher, AlertNotificationDispatcher>();
     builder.Services.AddSingleton<IRealtimeNotifier, RealtimeNotifier>();
     builder.Services.AddHostedService<DeviceOfflineMonitorService>();
+    builder.Services.AddScoped<IReadingRetentionService, ReadingRetentionService>();
+    builder.Services.AddHostedService<ReadingRetentionCleanupService>();
 
     builder.Services.AddSignalR();
     builder.Services.AddControllers();
