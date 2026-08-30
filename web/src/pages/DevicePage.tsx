@@ -24,6 +24,13 @@ export function DevicePage() {
   const [deviceKey, setDeviceKey] = useState('');
   const [simulateTemp, setSimulateTemp] = useState('6');
   const [simulating, setSimulating] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    name: '',
+    zoneName: '',
+    minTempC: '',
+    maxTempC: '',
+  });
   const refresh = useCallback(async () => {
     if (!token || !companyId || !deviceId) return;
     setError(null);
@@ -35,6 +42,12 @@ export function DevicePage() {
 
     if (deviceRes.success && deviceRes.data) {
       setDevice(deviceRes.data);
+      setSettingsForm({
+        name: deviceRes.data.name,
+        zoneName: deviceRes.data.zoneName,
+        minTempC: String(deviceRes.data.minTempC),
+        maxTempC: String(deviceRes.data.maxTempC),
+      });
     } else {
       setDevice(null);
       setError(deviceRes.message ?? 'Device not found');
@@ -107,6 +120,28 @@ export function DevicePage() {
     pushToast(`Reading ${simulateTemp}°C ingested`, 'success');
   }
 
+  async function handleUpdateSettings(event: FormEvent) {
+    event.preventDefault();
+    if (!token || !companyId || !deviceId) return;
+
+    setSavingSettings(true);
+    const response = await api.updateDevice(token, companyId, deviceId, {
+      name: settingsForm.name.trim(),
+      zoneName: settingsForm.zoneName.trim(),
+      minTempC: Number(settingsForm.minTempC),
+      maxTempC: Number(settingsForm.maxTempC),
+    });
+    setSavingSettings(false);
+
+    if (!response.success || !response.data) {
+      pushToast(response.message ?? 'Failed to update device', 'error');
+      return;
+    }
+
+    setDevice(response.data);
+    pushToast('Device settings saved', 'success');
+  }
+
   if (!device && !error) {
     return <p className="muted page-loading">Loading device…</p>;
   }
@@ -153,6 +188,54 @@ export function DevicePage() {
         <StatCard label="Readings loaded" value={readings.length} />
         <StatCard label="Last reading" value={formatDateTime(device.lastReadingAtUtc)} />
       </div>
+
+      {canManageDevices && (
+        <form id="device-settings" className="card stack" onSubmit={handleUpdateSettings}>
+          <h2>Device settings</h2>
+          <p className="muted small">Update name, zone, and safe temperature range.</p>
+          <label>
+            Name
+            <input
+              value={settingsForm.name}
+              onChange={(e) => setSettingsForm((f) => ({ ...f, name: e.target.value }))}
+              required
+            />
+          </label>
+          <label>
+            Zone
+            <input
+              value={settingsForm.zoneName}
+              onChange={(e) => setSettingsForm((f) => ({ ...f, zoneName: e.target.value }))}
+              required
+            />
+          </label>
+          <div className="inline-fields">
+            <label>
+              Min °C
+              <input
+                type="number"
+                step="0.1"
+                value={settingsForm.minTempC}
+                onChange={(e) => setSettingsForm((f) => ({ ...f, minTempC: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Max °C
+              <input
+                type="number"
+                step="0.1"
+                value={settingsForm.maxTempC}
+                onChange={(e) => setSettingsForm((f) => ({ ...f, maxTempC: e.target.value }))}
+                required
+              />
+            </label>
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={savingSettings}>
+            {savingSettings ? 'Saving…' : 'Save settings'}
+          </button>
+        </form>
+      )}
 
       <div className="card stack">
         <h2>Simulate IoT reading</h2>

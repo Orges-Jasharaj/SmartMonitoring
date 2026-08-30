@@ -169,3 +169,54 @@ public class DeleteDeviceHandler(
         return ResponseDto<bool>.SuccessResponse(true, "Device deleted.");
     }
 }
+
+public class UpdateDeviceHandler(
+    MonitoringDbContext dbContext,
+    ICompanyAccessService companyAccess,
+    ICurrentUserContext currentUser,
+    IAuditRecorder auditRecorder) : IRequestHandler<UpdateDeviceCommand, ResponseDto<DeviceDto>>
+{
+    public async Task<ResponseDto<DeviceDto>> Handle(UpdateDeviceCommand request, CancellationToken cancellationToken)
+    {
+        if (!await companyAccess.CanManageCompanyAsync(request.CompanyId, cancellationToken))
+        {
+            return ResponseDto<DeviceDto>.Failure("You do not have permission to update devices for this company.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.ZoneName))
+        {
+            return ResponseDto<DeviceDto>.Failure("Device name and zone name are required.");
+        }
+
+        if (request.MinTempC >= request.MaxTempC)
+        {
+            return ResponseDto<DeviceDto>.Failure("Minimum temperature must be less than maximum temperature.");
+        }
+
+        var device = await dbContext.Devices
+            .FirstOrDefaultAsync(d => d.Id == request.DeviceId && d.CompanyId == request.CompanyId, cancellationToken);
+
+        if (device == null)
+        {
+            return ResponseDto<DeviceDto>.Failure("Device not found.");
+        }
+
+        device.Name = request.Name.Trim();
+        device.ZoneName = request.ZoneName.Trim();
+        device.MinTempC = request.MinTempC;
+        device.MaxTempC = request.MaxTempC;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditRecorder.RecordAsync(
+            "DeviceUpdated",
+            "Success",
+            actorUserId: currentUser.UserId,
+            targetEntityType: "Device",
+            targetEntityId: device.Id.ToString(),
+            detail: device.Name,
+            cancellationToken: cancellationToken);
+
+        return ResponseDto<DeviceDto>.SuccessResponse(CreateDeviceHandler.Map(device), "Device updated.");
+    }
+}

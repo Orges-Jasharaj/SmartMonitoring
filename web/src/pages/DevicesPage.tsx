@@ -242,14 +242,22 @@ export function DevicesPage() {
                       </div>
                     </Link>
                     {canManage && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm device-delete-btn"
-                        disabled={deletingId === device.id}
-                        onClick={() => void handleDeleteDevice(device, companyId)}
-                      >
-                        {deletingId === device.id ? 'Deleting…' : 'Delete'}
-                      </button>
+                      <div className="status-row-actions">
+                        <Link
+                          to={`/companies/${companyId}/devices/${device.id}#device-settings`}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm device-delete-btn"
+                          disabled={deletingId === device.id}
+                          onClick={() => void handleDeleteDevice(device, companyId)}
+                        >
+                          {deletingId === device.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </div>
                     )}
                   </div>
                   <p className="muted small device-row-meta">Last reading {formatDateTime(device.lastReadingAtUtc)}</p>

@@ -47,6 +47,23 @@ public class DevicesController(IMediator mediator) : ControllerBase
         if (!response.Success) return BadRequest(response);
         return Ok(response);
     }
+
+    [HttpPut("{deviceId:guid}")]
+    public async Task<IActionResult> Update(Guid companyId, Guid deviceId, [FromBody] UpdateDeviceRequest request)
+    {
+        var response = await mediator.Send(new UpdateDeviceCommand
+        {
+            CompanyId = companyId,
+            DeviceId = deviceId,
+            Name = request.Name,
+            ZoneName = request.ZoneName,
+            MinTempC = request.MinTempC,
+            MaxTempC = request.MaxTempC
+        });
+
+        if (!response.Success) return BadRequest(response);
+        return Ok(response);
+    }
 }
 
 [ApiController]
@@ -64,6 +81,14 @@ public class DeviceDetailsController(IMediator mediator) : ControllerBase
 }
 
 public class CreateDeviceRequest
+{
+    public string Name { get; set; } = null!;
+    public string ZoneName { get; set; } = null!;
+    public decimal MinTempC { get; set; }
+    public decimal MaxTempC { get; set; }
+}
+
+public class UpdateDeviceRequest
 {
     public string Name { get; set; } = null!;
     public string ZoneName { get; set; } = null!;

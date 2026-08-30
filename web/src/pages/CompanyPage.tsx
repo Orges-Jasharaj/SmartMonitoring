@@ -470,9 +470,14 @@ function DeviceCard({
         <p className="muted small">Last: {formatDateTime(device.lastReadingAtUtc)}</p>
       </Link>
       {canManageDevices && onDelete && (
-        <button type="button" className="btn btn-ghost btn-sm device-delete-btn" onClick={onDelete}>
-          Delete
-        </button>
+        <div className="device-card-actions">
+          <Link to={`/companies/${companyId}/devices/${device.id}#device-settings`} className="btn btn-ghost btn-sm">
+            Edit
+          </Link>
+          <button type="button" className="btn btn-ghost btn-sm device-delete-btn" onClick={onDelete}>
+            Delete
+          </button>
+        </div>
       )}
     </div>
   );

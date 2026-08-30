@@ -18,6 +18,16 @@ public class DeleteDeviceCommand : IRequest<ResponseDto<bool>>
     public Guid DeviceId { get; set; }
 }
 
+public class UpdateDeviceCommand : IRequest<ResponseDto<DeviceDto>>
+{
+    public Guid CompanyId { get; set; }
+    public Guid DeviceId { get; set; }
+    public string Name { get; set; } = null!;
+    public string ZoneName { get; set; } = null!;
+    public decimal MinTempC { get; set; }
+    public decimal MaxTempC { get; set; }
+}
+
 public class DeviceDto
 {
     public Guid Id { get; set; }

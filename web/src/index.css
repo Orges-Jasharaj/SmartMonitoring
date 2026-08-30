@@ -725,10 +725,27 @@ select:focus {
 }
 
 .device-delete-btn {
-  margin: 0 1rem 1rem;
   align-self: flex-start;
   color: #fca5a5;
   border-color: rgba(248, 113, 113, 0.35);
+}
+
+.device-card-actions,
+.status-row-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 1rem 1rem;
+  flex-wrap: wrap;
+}
+
+.status-row-actions {
+  margin: 0;
+  align-self: center;
+}
+
+.device-card-actions .device-delete-btn,
+.status-row-actions .device-delete-btn {
+  margin: 0;
 }
 
 .device-delete-btn:hover:not(:disabled) {
