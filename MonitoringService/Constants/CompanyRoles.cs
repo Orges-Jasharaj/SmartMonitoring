@@ -17,4 +17,5 @@ public static class AlertTypes
 {
     public const string TemperatureOutOfRange = "TemperatureOutOfRange";
     public const string TemperatureNormalized = "TemperatureNormalized";
+    public const string DeviceOffline = "DeviceOffline";
 }

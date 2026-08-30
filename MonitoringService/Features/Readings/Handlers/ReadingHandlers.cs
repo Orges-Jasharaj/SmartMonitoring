@@ -13,6 +13,7 @@ namespace MonitoringService.Features.Readings.Handlers;
 public class IngestReadingHandler(
     MonitoringDbContext dbContext,
     IAlertEvaluator alertEvaluator,
+    IDeviceOfflineEvaluator deviceOfflineEvaluator,
     IAlertNotificationDispatcher alertNotificationDispatcher,
     IRealtimeNotifier realtimeNotifier,
     IAuditRecorder auditRecorder) : IRequestHandler<IngestReadingCommand, ResponseDto<ReadingDto>>
@@ -46,7 +47,9 @@ public class IngestReadingHandler(
 
         device.LastReadingAtUtc = measuredAt;
         dbContext.TemperatureReadings.Add(reading);
-        var alertsToNotify = await alertEvaluator.EvaluateReadingAsync(device, request.TemperatureC, cancellationToken);
+        var temperatureAlerts = await alertEvaluator.EvaluateReadingAsync(device, request.TemperatureC, cancellationToken);
+        var offlineAlerts = await deviceOfflineEvaluator.EvaluateDeviceReadingAsync(device, cancellationToken);
+        var alertsToNotify = temperatureAlerts.Concat(offlineAlerts).ToList();
         await dbContext.SaveChangesAsync(cancellationToken);
         await alertNotificationDispatcher.DispatchAsync(device, alertsToNotify, cancellationToken);
 

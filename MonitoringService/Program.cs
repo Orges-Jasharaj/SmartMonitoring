@@ -35,8 +35,10 @@ try
     builder.Services.AddScoped<ICurrentUserContext, CurrentUserContext>();
     builder.Services.AddScoped<ICompanyAccessService, CompanyAccessService>();
     builder.Services.AddScoped<IAlertEvaluator, AlertEvaluator>();
+    builder.Services.AddScoped<IDeviceOfflineEvaluator, DeviceOfflineEvaluator>();
     builder.Services.AddScoped<IAlertNotificationDispatcher, AlertNotificationDispatcher>();
     builder.Services.AddSingleton<IRealtimeNotifier, RealtimeNotifier>();
+    builder.Services.AddHostedService<DeviceOfflineMonitorService>();
 
     builder.Services.AddSignalR();
     builder.Services.AddControllers();
