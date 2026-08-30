@@ -32,20 +32,7 @@ export function DevicesPage() {
   const selectedCompanyId = deviceForm.companyId || accessibleCompanies[0]?.id || '';
 
   function canManageCompany(companyId: string) {
-    if (isAdmin) {
-      return true;
-    }
-
-    if (!userId) {
-      return false;
-    }
-
-    const members = membersByCompanyId[companyId] ?? [];
-    if (members.length > 0) {
-      return canManageCompanyDevices(isAdmin, userId, members);
-    }
-
-    return accessibleCompanies.some((company) => company.id === companyId);
+    return canManageCompanyDevices(isAdmin, userId, membersByCompanyId[companyId] ?? []);
   }
 
   async function handleCreateDevice(event: FormEvent) {

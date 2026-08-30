@@ -37,6 +37,25 @@ public class CreateCompanyHandler(
         };
 
         dbContext.Companies.Add(company);
+
+        var adminUserId = !string.IsNullOrWhiteSpace(request.InitialAdminUserId)
+            ? request.InitialAdminUserId.Trim()
+            : currentUser.UserId;
+
+        CompanyUser? adminMember = null;
+        if (!string.IsNullOrWhiteSpace(adminUserId))
+        {
+            adminMember = new CompanyUser
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                UserId = adminUserId,
+                Role = CompanyRoles.CompanyAdmin,
+                AssignedAtUtc = DateTime.UtcNow
+            };
+            dbContext.CompanyUsers.Add(adminMember);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await auditRecorder.RecordAsync(
@@ -47,6 +66,18 @@ public class CreateCompanyHandler(
             targetEntityId: company.Id.ToString(),
             detail: company.Name,
             cancellationToken: cancellationToken);
+
+        if (adminMember != null)
+        {
+            await auditRecorder.RecordAsync(
+                "CompanyUserAssigned",
+                "Success",
+                actorUserId: currentUser.UserId,
+                targetEntityType: "CompanyUser",
+                targetEntityId: adminMember.Id.ToString(),
+                detail: CompanyRoles.CompanyAdmin,
+                cancellationToken: cancellationToken);
+        }
 
         return ResponseDto<CompanyDto>.SuccessResponse(Map(company), "Company created");
     }
@@ -173,6 +204,41 @@ public class GetCompanyByIdHandler(
         }
 
         return ResponseDto<CompanyDto>.SuccessResponse(CreateCompanyHandler.Map(company));
+    }
+}
+
+public class DeleteCompanyHandler(
+    MonitoringDbContext dbContext,
+    ICurrentUserContext currentUser,
+    IAuditRecorder auditRecorder) : IRequestHandler<DeleteCompanyCommand, ResponseDto<bool>>
+{
+    public async Task<ResponseDto<bool>> Handle(DeleteCompanyCommand request, CancellationToken cancellationToken)
+    {
+        if (!currentUser.IsSystemAdmin)
+        {
+            return ResponseDto<bool>.Failure("Only system administrators can delete companies.");
+        }
+
+        var company = await dbContext.Companies.FirstOrDefaultAsync(c => c.Id == request.CompanyId, cancellationToken);
+        if (company == null)
+        {
+            return ResponseDto<bool>.Failure("Company not found.");
+        }
+
+        var companyName = company.Name;
+        dbContext.Companies.Remove(company);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditRecorder.RecordAsync(
+            "CompanyDeleted",
+            "Success",
+            actorUserId: currentUser.UserId,
+            targetEntityType: "Company",
+            targetEntityId: request.CompanyId.ToString(),
+            detail: companyName,
+            cancellationToken: cancellationToken);
+
+        return ResponseDto<bool>.SuccessResponse(true, "Company deleted.");
     }
 }
 

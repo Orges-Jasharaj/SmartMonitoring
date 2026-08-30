@@ -104,11 +104,18 @@ export const api = {
     return request<Company>(`/monitoring/api/companies/${companyId}`, { token });
   },
 
-  createCompany(token: string, name: string) {
+  createCompany(token: string, name: string, initialAdminUserId?: string) {
     return request<Company>('/monitoring/api/companies', {
       method: 'POST',
       token,
-      body: { name },
+      body: { name, initialAdminUserId: initialAdminUserId || undefined },
+    });
+  },
+
+  deleteCompany(token: string, companyId: string) {
+    return request<boolean>(`/monitoring/api/companies/${companyId}`, {
+      method: 'DELETE',
+      token,
     });
   },
 

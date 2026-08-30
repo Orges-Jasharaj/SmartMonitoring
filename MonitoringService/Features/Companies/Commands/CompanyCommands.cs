@@ -6,6 +6,7 @@ namespace MonitoringService.Features.Companies.Commands;
 public class CreateCompanyCommand : IRequest<ResponseDto<CompanyDto>>
 {
     public string Name { get; set; } = null!;
+    public string? InitialAdminUserId { get; set; }
 }
 
 public class AssignCompanyUserCommand : IRequest<ResponseDto<CompanyUserDto>>
@@ -13,6 +14,11 @@ public class AssignCompanyUserCommand : IRequest<ResponseDto<CompanyUserDto>>
     public Guid CompanyId { get; set; }
     public string UserId { get; set; } = null!;
     public string Role { get; set; } = null!;
+}
+
+public class DeleteCompanyCommand : IRequest<ResponseDto<bool>>
+{
+    public Guid CompanyId { get; set; }
 }
 
 public class CompanyDto

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Device, DeviceCreated, Reading } from '../api/types';
 import { StatCard } from '../components/StatCard';
@@ -22,6 +22,7 @@ function parseTab(value: string | null): Tab {
 
 export function CompanyPage() {
   const { companyId = '' } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { token, isAdmin, userId } = useAuth();
   const { pushToast } = useToast();
@@ -101,6 +102,26 @@ export function CompanyPage() {
     await refresh();
   }
 
+  async function handleDeleteCompany() {
+    if (!token || !companyId || !company) return;
+    if (
+      !window.confirm(
+        `Delete company "${company.name}"? This permanently removes its devices, readings, alerts, and team assignments.`,
+      )
+    ) {
+      return;
+    }
+
+    const response = await api.deleteCompany(token, companyId);
+    if (!response.success) {
+      pushToast(response.message ?? 'Failed to delete company', 'error');
+      return;
+    }
+
+    pushToast(`Company "${company.name}" deleted`, 'success');
+    navigate('/');
+  }
+
   function deviceName(deviceId: string) {
     return devices.find((d) => d.id === deviceId)?.name ?? deviceId.slice(0, 8);
   }
@@ -134,6 +155,11 @@ export function CompanyPage() {
           <button type="button" className="btn btn-ghost" onClick={() => void refresh()}>
             Refresh
           </button>
+          {isAdmin && company && (
+            <button type="button" className="btn btn-ghost company-delete-btn" onClick={() => void handleDeleteCompany()}>
+              Delete company
+            </button>
+          )}
         </div>
       </div>
 

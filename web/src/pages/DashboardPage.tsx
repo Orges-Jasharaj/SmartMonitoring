@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import type { User } from '../api/types';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
@@ -11,14 +12,32 @@ export function DashboardPage() {
   const { pushToast } = useToast();
   const { summaries, loading, error, refresh, totals } = useGlobalMonitoring(token);
   const [newCompanyName, setNewCompanyName] = useState('');
+  const [initialAdminUserId, setInitialAdminUserId] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
   const [creating, setCreating] = useState(false);
+  const [deletingCompanyId, setDeletingCompanyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token || !isAdmin) {
+      setUsers([]);
+      return;
+    }
+
+    void api.getUsers(token).then((response) => {
+      setUsers(response.data ?? []);
+    });
+  }, [token, isAdmin]);
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
     if (!token || !newCompanyName.trim()) return;
 
     setCreating(true);
-    const response = await api.createCompany(token, newCompanyName.trim());
+    const response = await api.createCompany(
+      token,
+      newCompanyName.trim(),
+      initialAdminUserId || undefined,
+    );
     setCreating(false);
 
     if (!response.success) {
@@ -27,7 +46,31 @@ export function DashboardPage() {
     }
 
     setNewCompanyName('');
+    setInitialAdminUserId('');
     pushToast(`Company "${response.data?.name}" created`, 'success');
+    await refresh();
+  }
+
+  async function handleDeleteCompany(companyId: string, companyName: string) {
+    if (!token) return;
+    if (
+      !window.confirm(
+        `Delete company "${companyName}"? This permanently removes its devices, readings, alerts, and team assignments.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingCompanyId(companyId);
+    const response = await api.deleteCompany(token, companyId);
+    setDeletingCompanyId(null);
+
+    if (!response.success) {
+      pushToast(response.message ?? 'Failed to delete company', 'error');
+      return;
+    }
+
+    pushToast(`Company "${companyName}" deleted`, 'success');
     await refresh();
   }
 
@@ -65,26 +108,37 @@ export function DashboardPage() {
           )}
           <div className="company-grid">
             {summaries.map(({ company, deviceCount, activeAlerts, devicesOk, devicesAlerting }) => (
-              <Link
+              <div
                 key={company.id}
-                to={`/companies/${company.id}`}
                 className={`company-card${activeAlerts > 0 ? ' company-card-alert' : ''}`}
               >
-                <div className="company-card-top">
-                  <strong>{company.name}</strong>
-                  {activeAlerts > 0 && (
-                    <span className="pill pill-danger">
-                      {activeAlerts} alert{activeAlerts > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-                <div className="company-card-stats">
-                  <span>{deviceCount} devices</span>
-                  <span className="ok-text">{devicesOk} OK</span>
-                  {devicesAlerting > 0 && <span className="danger-text">{devicesAlerting} alerting</span>}
-                </div>
-                <span className="muted small">Created {new Date(company.createdAtUtc).toLocaleDateString()}</span>
-              </Link>
+                <Link to={`/companies/${company.id}`} className="company-card-body link-card">
+                  <div className="company-card-top">
+                    <strong>{company.name}</strong>
+                    {activeAlerts > 0 && (
+                      <span className="pill pill-danger">
+                        {activeAlerts} alert{activeAlerts > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="company-card-stats">
+                    <span>{deviceCount} devices</span>
+                    <span className="ok-text">{devicesOk} OK</span>
+                    {devicesAlerting > 0 && <span className="danger-text">{devicesAlerting} alerting</span>}
+                  </div>
+                  <span className="muted small">Created {new Date(company.createdAtUtc).toLocaleDateString()}</span>
+                </Link>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm company-delete-btn"
+                    disabled={deletingCompanyId === company.id}
+                    onClick={() => void handleDeleteCompany(company.id, company.name)}
+                  >
+                    {deletingCompanyId === company.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -101,6 +155,20 @@ export function DashboardPage() {
                 placeholder="e.g. City Pharmacy"
               />
             </label>
+            <label>
+              Company admin
+              <select value={initialAdminUserId} onChange={(e) => setInitialAdminUserId(e.target.value)}>
+                <option value="">Assign yourself as company admin</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.userName} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="muted small">
+              The selected user is automatically assigned as CompanyAdmin and can manage devices and team members.
+            </p>
             <button type="submit" className="btn btn-primary" disabled={creating || !newCompanyName.trim()}>
               {creating ? 'Creating…' : 'Create company'}
             </button>

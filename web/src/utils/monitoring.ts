@@ -53,5 +53,8 @@ export function canManageCompanyDevices(
   }
 
   const normalizedUserId = userId.toLowerCase();
-  return members.some((member) => member.userId.toLowerCase() === normalizedUserId);
+  return members.some(
+    (member) =>
+      member.userId.toLowerCase() === normalizedUserId && member.role === 'CompanyAdmin',
+  );
 }

@@ -36,6 +36,15 @@ public class CompaniesController(IMediator mediator) : ControllerBase
         return Ok(response);
     }
 
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var response = await mediator.Send(new DeleteCompanyCommand { CompanyId = id });
+        if (!response.Success) return BadRequest(response);
+        return Ok(response);
+    }
+
     [HttpGet("{companyId:guid}/users")]
     public async Task<IActionResult> GetUsers(Guid companyId)
     {
