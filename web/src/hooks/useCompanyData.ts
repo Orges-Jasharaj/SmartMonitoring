@@ -7,7 +7,8 @@ import {
   prependReading,
   updateDeviceLastReading,
 } from '../realtime/monitoringHub';
-import { getDeviceStatus } from '../utils/monitoring';
+import { summarizeDeviceStatuses } from '../utils/monitoring';
+import { useMonitoringClock } from './useMonitoringClock';
 
 type CompanyData = {
   company: Company | null;
@@ -36,6 +37,7 @@ const initialState: CompanyData = {
 };
 
 export function useCompanyData(companyId: string, token: string | null) {
+  const now = useMonitoringClock();
   const [data, setData] = useState<CompanyData>(initialState);
 
   const refresh = useCallback(async () => {
@@ -115,13 +117,7 @@ export function useCompanyData(companyId: string, token: string | null) {
     onAlert: handleAlert,
   });
 
-  const devicesOk = data.devices.filter(
-    (device) => getDeviceStatus(device, data.readings).tone === 'ok',
-  ).length;
-
-  const devicesAlerting = data.devices.filter(
-    (device) => getDeviceStatus(device, data.readings).tone === 'danger',
-  ).length;
+  const statusCounts = summarizeDeviceStatuses(data.devices, data.readings, now);
 
   return {
     ...data,
@@ -129,8 +125,7 @@ export function useCompanyData(companyId: string, token: string | null) {
     stats: {
       deviceCount: data.devices.length,
       activeAlerts: data.alerts.length,
-      devicesOk,
-      devicesAlerting,
+      ...statusCounts,
       memberCount: data.members.length,
       readingCount: data.readings.length,
     },

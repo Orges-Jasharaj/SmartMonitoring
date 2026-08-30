@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { AlertAcknowledgeButton } from './AlertAcknowledgeButton';
+import { useToast } from './Toast';
 import { useAlertNotifications } from '../hooks/useAlertNotifications';
 import { formatDateTime } from '../utils/monitoring';
 
@@ -17,6 +19,7 @@ function BellIcon() {
 
 export function AlertNotificationBell() {
   const { token, userId } = useAuth();
+  const { pushToast } = useToast();
   const [open, setOpen] = useState(false);
   const { items, loading, refresh, unreadCount } = useAlertNotifications(token, userId, open);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -87,23 +90,35 @@ export function AlertNotificationBell() {
 
             <ul className="notification-list">
               {items.map(({ alert, companyId, companyName, deviceName }) => (
-                <li key={alert.id}>
-                  <Link
-                    to={`/companies/${companyId}?tab=alerts`}
-                    className="notification-item"
-                    onClick={() => setOpen(false)}
-                  >
-                    <div className="notification-item-top">
-                      <strong>{deviceName}</strong>
-                      <span className="pill pill-danger">Alert</span>
-                    </div>
-                    <p className="muted small">{companyName}</p>
-                    <p className="small">{alert.message}</p>
-                    {alert.temperatureC != null && (
-                      <p className="small danger-text">{alert.temperatureC}°C</p>
-                    )}
-                    <p className="muted small">{formatDateTime(alert.triggeredAtUtc)}</p>
-                  </Link>
+                <li key={alert.id} className="notification-list-item">
+                  <div className="alert-item-row">
+                    <Link
+                      to={`/companies/${companyId}?tab=alerts`}
+                      className="notification-item alert-item-body"
+                      onClick={() => setOpen(false)}
+                    >
+                      <div className="notification-item-top">
+                        <strong>{deviceName}</strong>
+                        <span className="pill pill-danger">Alert</span>
+                      </div>
+                      <p className="muted small">{companyName}</p>
+                      <p className="small">{alert.message}</p>
+                      {alert.temperatureC != null && (
+                        <p className="small danger-text">{alert.temperatureC}°C</p>
+                      )}
+                      <p className="muted small">{formatDateTime(alert.triggeredAtUtc)}</p>
+                    </Link>
+                    <AlertAcknowledgeButton
+                      token={token}
+                      companyId={companyId}
+                      alert={alert}
+                      onAcknowledged={() => {
+                        pushToast('Alert acknowledged', 'success');
+                        void refresh();
+                      }}
+                      onError={(message) => pushToast(message, 'error')}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

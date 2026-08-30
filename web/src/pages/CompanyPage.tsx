@@ -3,11 +3,13 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client';
 import type { Device, DeviceCreated, Reading } from '../api/types';
 import { StatCard } from '../components/StatCard';
+import { AlertAcknowledgeButton } from '../components/AlertAcknowledgeButton';
 import { TemperatureChart } from '../components/TemperatureChart';
 import { useToast } from '../components/Toast';
 import { useCompanyData } from '../hooks/useCompanyData';
 import { useAuth } from '../auth/AuthContext';
-import { canManageCompanyDevices, copyToClipboard, formatDateTime, getDeviceStatus } from '../utils/monitoring';
+import { canManageCompanyDevices, copyToClipboard, deviceCardClass, deviceStatusRowClass, formatDateTime, getDeviceStatus } from '../utils/monitoring';
+import { useMonitoringClock } from '../hooks/useMonitoringClock';
 
 type Tab = 'overview' | 'devices' | 'readings' | 'alerts' | 'team';
 
@@ -30,6 +32,7 @@ export function CompanyPage() {
     useCompanyData(companyId, token);
 
   const canManageDevices = canManageCompanyDevices(isAdmin, userId, members);
+  const now = useMonitoringClock();
 
   const [tab, setTab] = useState<Tab>(() => parseTab(searchParams.get('tab')));
 
@@ -169,6 +172,12 @@ export function CompanyPage() {
         <StatCard label="Devices" value={stats.deviceCount} />
         <StatCard label="Active alerts" value={stats.activeAlerts} tone={stats.activeAlerts > 0 ? 'danger' : 'ok'} />
         <StatCard label="Devices OK" value={stats.devicesOk} tone="ok" />
+        <StatCard
+          label="Offline"
+          value={stats.devicesOffline}
+          tone={stats.devicesOffline > 0 ? 'warning' : 'default'}
+          hint="No reading for 30+ min"
+        />
         <StatCard label="Team members" value={stats.memberCount} hint="Alert email recipients" />
       </div>
 
@@ -200,12 +209,12 @@ export function CompanyPage() {
               {devices.length === 0 && <p className="muted">No devices yet.</p>}
               <ul className="status-list">
                 {devices.map((device) => {
-                  const status = getDeviceStatus(device, readings);
+                  const status = getDeviceStatus(device, readings, now);
                   return (
                     <li key={device.id}>
                       <Link
                         to={`/companies/${companyId}/devices/${device.id}`}
-                        className={`status-row${status.tone === 'danger' ? ' status-row-alert' : ''}`}
+                        className={`status-row${deviceStatusRowClass(status.tone)}`}
                       >
                         <div>
                           <strong>{device.name}</strong>
@@ -227,8 +236,22 @@ export function CompanyPage() {
               <ul className="alert-list compact">
                 {alerts.slice(0, 5).map((alert) => (
                   <li key={alert.id} className="alert-item alert-item-active">
-                    <strong>{deviceName(alert.deviceId)}</strong>
-                    <p className="small">{alert.message}</p>
+                    <div className="alert-item-row">
+                      <div className="alert-item-body">
+                        <strong>{deviceName(alert.deviceId)}</strong>
+                        <p className="small">{alert.message}</p>
+                      </div>
+                      <AlertAcknowledgeButton
+                        token={token}
+                        companyId={companyId}
+                        alert={alert}
+                        onAcknowledged={() => {
+                          pushToast('Alert acknowledged', 'success');
+                          void refresh();
+                        }}
+                        onError={(message) => pushToast(message, 'error')}
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -342,12 +365,29 @@ export function CompanyPage() {
           <ul className="alert-list">
             {(showHistory ? alertHistory : alerts).map((alert) => (
               <li key={alert.id} className={`alert-item ${alert.isActive ? 'alert-item-active' : 'resolved'}`}>
-                <div>
-                  <strong>{deviceName(alert.deviceId)}</strong>
-                  <span className={`pill ${alert.isActive ? 'pill-danger' : 'pill-muted'}`}>{alert.alertType}</span>
+                <div className="alert-item-row">
+                  <div className="alert-item-body">
+                    <div>
+                      <strong>{deviceName(alert.deviceId)}</strong>
+                      <span className={`pill ${alert.isActive ? 'pill-danger' : 'pill-muted'}`}>{alert.alertType}</span>
+                    </div>
+                    <p>{alert.message}</p>
+                    <p className="muted small">{formatDateTime(alert.triggeredAtUtc)}</p>
+                    {!alert.isActive && alert.resolvedAtUtc && (
+                      <p className="muted small">Resolved {formatDateTime(alert.resolvedAtUtc)}</p>
+                    )}
+                  </div>
+                  <AlertAcknowledgeButton
+                    token={token}
+                    companyId={companyId}
+                    alert={alert}
+                    onAcknowledged={() => {
+                      pushToast('Alert acknowledged', 'success');
+                      void refresh();
+                    }}
+                    onError={(message) => pushToast(message, 'error')}
+                  />
                 </div>
-                <p>{alert.message}</p>
-                <p className="muted small">{formatDateTime(alert.triggeredAtUtc)}</p>
               </li>
             ))}
           </ul>
@@ -414,10 +454,11 @@ function DeviceCard({
   canManageDevices?: boolean;
   onDelete?: () => void;
 }) {
-  const status = getDeviceStatus(device, readings);
-  const hasAlert = status.tone === 'danger';
+  const now = useMonitoringClock();
+  const status = getDeviceStatus(device, readings, now);
+
   return (
-    <div className={`device-card${hasAlert ? ' device-card-alert' : ''}`}>
+    <div className={`device-card${deviceCardClass(status.tone)}`}>
       <Link to={`/companies/${companyId}/devices/${device.id}`} className="device-card-body link-card">
         <div className="device-card-header">
           <strong>{device.name}</strong>

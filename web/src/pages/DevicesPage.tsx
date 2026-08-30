@@ -6,7 +6,7 @@ import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 import { useGlobalMonitoring } from '../hooks/useGlobalMonitoring';
-import { canManageCompanyDevices, copyToClipboard, formatDateTime } from '../utils/monitoring';
+import { canManageCompanyDevices, copyToClipboard, deviceStatusRowClass, formatDateTime } from '../utils/monitoring';
 
 export function DevicesPage() {
   const { token, isAdmin, userId } = useAuth();
@@ -91,6 +91,7 @@ export function DevicesPage() {
 
   const devicesOk = devices.filter((item) => item.status.tone === 'ok').length;
   const devicesAlerting = devices.filter((item) => item.status.tone === 'danger').length;
+  const devicesOffline = devices.filter((item) => item.status.tone === 'warning').length;
 
   return (
     <section className="stack">
@@ -115,6 +116,12 @@ export function DevicesPage() {
         <StatCard label="Devices" value={totals.devices} />
         <StatCard label="OK" value={devicesOk} tone="ok" />
         <StatCard label="Alerting" value={devicesAlerting} tone={devicesAlerting > 0 ? 'danger' : 'default'} />
+        <StatCard
+          label="Offline"
+          value={devicesOffline}
+          tone={devicesOffline > 0 ? 'warning' : 'default'}
+          hint="No reading for 30+ min"
+        />
         <StatCard label="Companies" value={totals.companies} />
       </div>
 
@@ -221,7 +228,7 @@ export function DevicesPage() {
                   <div className="status-row-wrap">
                     <Link
                       to={`/companies/${companyId}/devices/${device.id}`}
-                      className={`status-row${status.tone === 'danger' ? ' status-row-alert' : ''}`}
+                      className={`status-row${deviceStatusRowClass(status.tone)}`}
                     >
                       <div>
                         <strong>{device.name}</strong>

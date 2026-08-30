@@ -80,6 +80,7 @@ export type CompanySummary = {
   activeAlerts: number;
   devicesOk: number;
   devicesAlerting: number;
+  devicesOffline: number;
 };
 
 export type RegisterResponse = {

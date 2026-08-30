@@ -107,7 +107,7 @@ export function DashboardPage() {
             <p className="muted">No companies yet. Create one if you are a system admin, or ask to be assigned.</p>
           )}
           <div className="company-grid">
-            {summaries.map(({ company, deviceCount, activeAlerts, devicesOk, devicesAlerting }) => (
+            {summaries.map(({ company, deviceCount, activeAlerts, devicesOk, devicesAlerting, devicesOffline }) => (
               <div
                 key={company.id}
                 className={`company-card${activeAlerts > 0 ? ' company-card-alert' : ''}`}
@@ -123,8 +123,9 @@ export function DashboardPage() {
                   </div>
                   <div className="company-card-stats">
                     <span>{deviceCount} devices</span>
-                    <span className="ok-text">{devicesOk} OK</span>
-                    {devicesAlerting > 0 && <span className="danger-text">{devicesAlerting} alerting</span>}
+                  <span className="ok-text">{devicesOk} OK</span>
+                  {devicesOffline > 0 && <span className="warning-text">{devicesOffline} offline</span>}
+                  {devicesAlerting > 0 && <span className="danger-text">{devicesAlerting} alerting</span>}
                   </div>
                   <span className="muted small">Created {new Date(company.createdAtUtc).toLocaleDateString()}</span>
                 </Link>

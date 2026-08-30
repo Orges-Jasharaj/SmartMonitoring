@@ -7,6 +7,7 @@ import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 import { useMonitoringHub } from '../hooks/useMonitoringHub';
+import { useMonitoringClock } from '../hooks/useMonitoringClock';
 import { prependReading } from '../realtime/monitoringHub';
 import { canManageCompanyDevices, formatDateTime, getDeviceStatus } from '../utils/monitoring';
 
@@ -15,6 +16,7 @@ export function DevicePage() {
   const navigate = useNavigate();
   const { token, isAdmin, userId } = useAuth();
   const { pushToast } = useToast();
+  const now = useMonitoringClock();
   const [device, setDevice] = useState<Device | null>(null);
   const [readings, setReadings] = useState<Reading[]>([]);
   const [members, setMembers] = useState<CompanyUser[]>([]);
@@ -118,7 +120,7 @@ export function DevicePage() {
     );
   }
 
-  const status = getDeviceStatus(device, readings);
+  const status = getDeviceStatus(device, readings, now);
 
   return (
     <section className="stack">
@@ -141,7 +143,12 @@ export function DevicePage() {
       {error && <p className="error-banner">{error}</p>}
 
       <div className="stat-grid">
-        <StatCard label="Status" value={status.label} tone={status.tone === 'danger' ? 'danger' : status.tone === 'ok' ? 'ok' : 'default'} />
+        <StatCard
+          label="Status"
+          value={status.label}
+          tone={status.tone === 'danger' ? 'danger' : status.tone === 'ok' ? 'ok' : status.tone === 'warning' ? 'warning' : 'default'}
+          hint={status.tone === 'warning' ? 'No reading for 30+ minutes' : undefined}
+        />
         <StatCard label="Latest temp" value={status.latestTemp !== undefined ? `${status.latestTemp}°C` : '—'} />
         <StatCard label="Readings loaded" value={readings.length} />
         <StatCard label="Last reading" value={formatDateTime(device.lastReadingAtUtc)} />

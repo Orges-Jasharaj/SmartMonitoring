@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
-import type { Alert, Company, CompanySummary, CompanyUser, Device } from '../api/types';
-import { getDeviceStatus, type DeviceStatus } from '../utils/monitoring';
+import type { Alert, Company, CompanySummary, CompanyUser, Device, Reading } from '../api/types';
+import { getDeviceStatus, summarizeDeviceStatuses, type DeviceStatus } from '../utils/monitoring';
+import { useMonitoringClock } from './useMonitoringClock';
 import { useMonitoringHub } from './useMonitoringHub';
 
 export type GlobalDevice = {
@@ -18,6 +19,12 @@ export type GlobalAlert = {
   deviceName: string;
 };
 
+type DeviceRow = {
+  device: Device;
+  companyId: string;
+  companyName: string;
+};
+
 async function loadCompanyMonitoring(token: string, company: Company) {
   const [devicesRes, alertsRes, alertHistoryRes, readingsRes, membersRes] = await Promise.all([
     api.getDevices(token, company.id),
@@ -31,23 +38,14 @@ async function loadCompanyMonitoring(token: string, company: Company) {
   const readings = readingsRes.data ?? [];
   const deviceNames = new Map(companyDevices.map((device) => [device.id, device.name]));
 
-  const devicesOk = companyDevices.filter((d) => getDeviceStatus(d, readings).tone === 'ok').length;
-  const devicesAlerting = companyDevices.filter((d) => getDeviceStatus(d, readings).tone === 'danger').length;
-
   return {
-    summary: {
-      company,
-      deviceCount: companyDevices.length,
-      activeAlerts: alertsRes.data?.length ?? 0,
-      devicesOk,
-      devicesAlerting,
-    } satisfies CompanySummary,
+    company,
     devices: companyDevices.map((device) => ({
       device,
       companyId: company.id,
       companyName: company.name,
-      status: getDeviceStatus(device, readings),
     })),
+    readings,
     alerts: (alertsRes.data ?? []).map((alert) => ({
       alert,
       companyId: company.id,
@@ -61,17 +59,21 @@ async function loadCompanyMonitoring(token: string, company: Company) {
       deviceName: deviceNames.get(alert.deviceId) ?? alert.deviceId.slice(0, 8),
     })),
     members: membersRes.data ?? [],
+    activeAlerts: alertsRes.data?.length ?? 0,
   };
 }
 
 const deviceToneOrder = { danger: 0, warning: 1, muted: 2, ok: 3 };
 
 export function useGlobalMonitoring(token: string | null) {
-  const [summaries, setSummaries] = useState<CompanySummary[]>([]);
-  const [devices, setDevices] = useState<GlobalDevice[]>([]);
+  const now = useMonitoringClock();
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [deviceRows, setDeviceRows] = useState<DeviceRow[]>([]);
+  const [readingsByCompanyId, setReadingsByCompanyId] = useState<Record<string, Reading[]>>({});
   const [alerts, setAlerts] = useState<GlobalAlert[]>([]);
   const [alertHistory, setAlertHistory] = useState<GlobalAlert[]>([]);
   const [membersByCompanyId, setMembersByCompanyId] = useState<Record<string, CompanyUser[]>>({});
+  const [activeAlertsByCompanyId, setActiveAlertsByCompanyId] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
@@ -83,11 +85,13 @@ export function useGlobalMonitoring(token: string | null) {
 
     const companiesRes = await api.getCompanies(token);
     if (!companiesRes.success || !companiesRes.data) {
-      setSummaries([]);
-      setDevices([]);
+      setCompanies([]);
+      setDeviceRows([]);
+      setReadingsByCompanyId({});
       setAlerts([]);
       setAlertHistory([]);
       setMembersByCompanyId({});
+      setActiveAlertsByCompanyId({});
       setLoading(false);
       setError(companiesRes.message ?? 'Failed to load monitoring data');
       return;
@@ -97,18 +101,16 @@ export function useGlobalMonitoring(token: string | null) {
       companiesRes.data.map(async (company) => loadCompanyMonitoring(token, company)),
     );
 
-    setSummaries(enriched.map((item) => item.summary));
-    setMembersByCompanyId(
-      Object.fromEntries(enriched.map((item) => [item.summary.company.id, item.members])),
+    setCompanies(enriched.map((item) => item.company));
+    setDeviceRows(enriched.flatMap((item) => item.devices));
+    setReadingsByCompanyId(
+      Object.fromEntries(enriched.map((item) => [item.company.id, item.readings])),
     );
-    setDevices(
-      enriched
-        .flatMap((item) => item.devices)
-        .sort((a, b) => {
-          const toneDiff = deviceToneOrder[a.status.tone] - deviceToneOrder[b.status.tone];
-          if (toneDiff !== 0) return toneDiff;
-          return a.device.name.localeCompare(b.device.name);
-        }),
+    setMembersByCompanyId(
+      Object.fromEntries(enriched.map((item) => [item.company.id, item.members])),
+    );
+    setActiveAlertsByCompanyId(
+      Object.fromEntries(enriched.map((item) => [item.company.id, item.activeAlerts])),
     );
     setAlerts(
       enriched
@@ -157,13 +159,52 @@ export function useGlobalMonitoring(token: string | null) {
     [],
   );
 
-  const totals = summaries.reduce(
-    (acc, item) => ({
-      companies: acc.companies + 1,
-      devices: acc.devices + item.deviceCount,
-      alerts: acc.alerts + item.activeAlerts,
-    }),
-    { companies: 0, devices: 0, alerts: 0 },
+  const summaries = useMemo(
+    () =>
+      companies.map((company) => {
+        const companyDevices = deviceRows
+          .filter((row) => row.companyId === company.id)
+          .map((row) => row.device);
+        const readings = readingsByCompanyId[company.id] ?? [];
+        const statusCounts = summarizeDeviceStatuses(companyDevices, readings, now);
+
+        return {
+          company,
+          deviceCount: companyDevices.length,
+          activeAlerts: activeAlertsByCompanyId[company.id] ?? 0,
+          ...statusCounts,
+        } satisfies CompanySummary;
+      }),
+    [companies, deviceRows, readingsByCompanyId, activeAlertsByCompanyId, now],
+  );
+
+  const devices = useMemo(
+    () =>
+      deviceRows
+        .map((row) => ({
+          ...row,
+          status: getDeviceStatus(row.device, readingsByCompanyId[row.companyId] ?? [], now),
+        }))
+        .sort((a, b) => {
+          const toneDiff = deviceToneOrder[a.status.tone] - deviceToneOrder[b.status.tone];
+          if (toneDiff !== 0) return toneDiff;
+          return a.device.name.localeCompare(b.device.name);
+        }),
+    [deviceRows, readingsByCompanyId, now],
+  );
+
+  const totals = useMemo(
+    () =>
+      summaries.reduce(
+        (acc, item) => ({
+          companies: acc.companies + 1,
+          devices: acc.devices + item.deviceCount,
+          alerts: acc.alerts + item.activeAlerts,
+          devicesOffline: acc.devicesOffline + item.devicesOffline,
+        }),
+        { companies: 0, devices: 0, alerts: 0, devicesOffline: 0 },
+      ),
+    [summaries],
   );
 
   return { summaries, devices, alerts, alertHistory, membersByCompanyId, loading, error, refresh, totals };

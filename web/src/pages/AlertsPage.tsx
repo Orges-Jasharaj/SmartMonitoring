@@ -1,16 +1,28 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../components/StatCard';
+import { AlertAcknowledgeButton } from '../components/AlertAcknowledgeButton';
+import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 import { useGlobalMonitoring } from '../hooks/useGlobalMonitoring';
 import { formatDateTime } from '../utils/monitoring';
 
 export function AlertsPage() {
   const { token } = useAuth();
+  const { pushToast } = useToast();
   const { alerts, alertHistory, loading, error, refresh, totals } = useGlobalMonitoring(token);
   const [showHistory, setShowHistory] = useState(false);
 
   const visibleAlerts = showHistory ? alertHistory : alerts;
+
+  async function handleAcknowledged() {
+    pushToast('Alert acknowledged', 'success');
+    void refresh();
+  }
+
+  function handleAcknowledgeError(message: string) {
+    pushToast(message, 'error');
+  }
 
   return (
     <section className="stack">
@@ -57,23 +69,32 @@ export function AlertsPage() {
         <ul className="alert-list">
           {visibleAlerts.map(({ alert, companyId, companyName, deviceName }) => (
             <li key={alert.id} className={`alert-item${alert.isActive ? ' alert-item-active' : ' resolved'}`}>
-              <Link to={`/companies/${companyId}?tab=alerts`} className="dashboard-link-block">
-                <div className="notification-item-top">
-                  <div>
-                    <strong>{deviceName}</strong>
-                    <span className="muted small"> · {companyName}</span>
+              <div className="alert-item-row">
+                <Link to={`/companies/${companyId}?tab=alerts`} className="dashboard-link-block alert-item-body">
+                  <div className="notification-item-top">
+                    <div>
+                      <strong>{deviceName}</strong>
+                      <span className="muted small"> · {companyName}</span>
+                    </div>
+                    <span className={`pill ${alert.isActive ? 'pill-danger' : 'pill-muted'}`}>{alert.alertType}</span>
                   </div>
-                  <span className={`pill ${alert.isActive ? 'pill-danger' : 'pill-muted'}`}>{alert.alertType}</span>
-                </div>
-                <p className="small">{alert.message}</p>
-                {alert.temperatureC != null && (
-                  <p className={`small${alert.isActive ? ' danger-text' : ''}`}>{alert.temperatureC}°C</p>
-                )}
-                <p className="muted small">Triggered {formatDateTime(alert.triggeredAtUtc)}</p>
-                {!alert.isActive && alert.resolvedAtUtc && (
-                  <p className="muted small">Resolved {formatDateTime(alert.resolvedAtUtc)}</p>
-                )}
-              </Link>
+                  <p className="small">{alert.message}</p>
+                  {alert.temperatureC != null && (
+                    <p className={`small${alert.isActive ? ' danger-text' : ''}`}>{alert.temperatureC}°C</p>
+                  )}
+                  <p className="muted small">Triggered {formatDateTime(alert.triggeredAtUtc)}</p>
+                  {!alert.isActive && alert.resolvedAtUtc && (
+                    <p className="muted small">Resolved {formatDateTime(alert.resolvedAtUtc)}</p>
+                  )}
+                </Link>
+                <AlertAcknowledgeButton
+                  token={token}
+                  companyId={companyId}
+                  alert={alert}
+                  onAcknowledged={handleAcknowledged}
+                  onError={handleAcknowledgeError}
+                />
+              </div>
             </li>
           ))}
         </ul>

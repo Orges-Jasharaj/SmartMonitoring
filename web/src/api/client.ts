@@ -147,6 +147,13 @@ export const api = {
     return request<Alert[]>(`/monitoring/api/companies/${companyId}/alerts${query}`, { token });
   },
 
+  acknowledgeAlert(token: string, companyId: string, alertId: string) {
+    return request<Alert>(`/monitoring/api/companies/${companyId}/alerts/${alertId}/acknowledge`, {
+      method: 'POST',
+      token,
+    });
+  },
+
   getReadings(token: string, companyId: string, deviceId?: string, limit = 50) {
     const params = new URLSearchParams({ limit: String(limit) });
     if (deviceId) {
