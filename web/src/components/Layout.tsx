@@ -20,11 +20,15 @@ export function Layout() {
         </NavLink>
 
         <nav className="topnav" aria-label="Main">
-          <NavLink to="/" end>
+          <NavLink to="/" end data-testid="nav-dashboard">
             Dashboard
           </NavLink>
-          <NavLink to="/alerts">Alerts</NavLink>
-          <NavLink to="/devices">Devices</NavLink>
+          <NavLink to="/alerts" data-testid="nav-alerts">
+            Alerts
+          </NavLink>
+          <NavLink to="/devices" data-testid="nav-devices">
+            Devices
+          </NavLink>
           {isAdmin && (
             <>
               <NavLink to="/audit">Audit</NavLink>
@@ -42,7 +46,7 @@ export function Layout() {
             <span className="user-avatar">{initials}</span>
             {userName && <span className="user-name">{userName}</span>}
           </div>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={logout}>
+          <button type="button" className="btn btn-ghost btn-sm" data-testid="nav-sign-out" onClick={logout}>
             Sign out
           </button>
         </div>

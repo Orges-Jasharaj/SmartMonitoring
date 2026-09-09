@@ -75,7 +75,7 @@ export function DashboardPage() {
   }
 
   return (
-    <section className="stack">
+    <section className="stack" data-testid="page-dashboard">
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>

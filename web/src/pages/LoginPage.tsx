@@ -52,6 +52,7 @@ export function LoginPage() {
         <label>
           Username or email
           <input
+            data-testid="login-username"
             value={userNameOrEmail}
             onChange={(e) => setUserNameOrEmail(e.target.value)}
             autoComplete="username"
@@ -63,6 +64,7 @@ export function LoginPage() {
         <label>
           Password
           <input
+            data-testid="login-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -72,9 +74,13 @@ export function LoginPage() {
           />
         </label>
 
-        {error && <p className="error-banner">{error}</p>}
+        {error && (
+          <p className="error-banner" data-testid="login-error">
+            {error}
+          </p>
+        )}
 
-        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+        <button type="submit" className="btn btn-primary btn-block" data-testid="login-submit" disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

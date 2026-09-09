@@ -94,7 +94,7 @@ export function DevicesPage() {
   const devicesOffline = devices.filter((item) => item.status.tone === 'warning').length;
 
   return (
-    <section className="stack">
+    <section className="stack" data-testid="page-devices">
       <div className="page-header">
         <div>
           <h1>Devices</h1>

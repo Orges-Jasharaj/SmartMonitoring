@@ -221,7 +221,7 @@ using (var scope = app.Services.CreateScope())
     }
     else
     {
-        // create admin user if not exists
+        // create admin user if not exists; ensure seeded admin can always sign in
         var adminUser = userManager.FindByNameAsync(adminUserName).GetAwaiter().GetResult();
         if (adminUser == null)
         {
@@ -245,6 +245,13 @@ using (var scope = app.Services.CreateScope())
             {
                 logger.LogWarning("Failed to create admin user: {Errors}", string.Join(';', result.Errors.Select(e => e.Description)));
             }
+        }
+        else if (!adminUser.EmailConfirmed || !adminUser.isActive)
+        {
+            adminUser.EmailConfirmed = true;
+            adminUser.isActive = true;
+            userManager.UpdateAsync(adminUser).GetAwaiter().GetResult();
+            logger.LogInformation("Admin user updated for local/dev sign-in: {UserName}", adminUserName);
         }
     }
 }

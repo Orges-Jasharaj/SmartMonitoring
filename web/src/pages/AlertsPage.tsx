@@ -25,7 +25,7 @@ export function AlertsPage() {
   }
 
   return (
-    <section className="stack">
+    <section className="stack" data-testid="page-alerts">
       <div className="page-header">
         <div>
           <h1>Alerts</h1>
