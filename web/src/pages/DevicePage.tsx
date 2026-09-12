@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { CompanyUser, Device, Reading } from '../api/types';
-import { TemperatureChart } from '../components/TemperatureChart';
+import { EnvironmentalCharts } from '../components/EnvironmentalCharts';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
@@ -12,7 +12,14 @@ import { prependReading } from '../realtime/monitoringHub';
 import { DeviceKeyPanel } from '../components/DeviceKeyPanel';
 import { DeviceThresholdFields } from '../components/DeviceThresholdFields';
 import { deviceThresholdFormFromDevice, parseDeviceThresholdPayload } from '../constants/deviceDefaults';
-import { canManageCompanyDevices, formatDateTime, formatMetric, getDeviceStatus } from '../utils/monitoring';
+import {
+  canManageCompanyDevices,
+  formatDateTime,
+  formatMetric,
+  getDeviceLastReadingAt,
+  getDeviceStatus,
+  getLatestReading,
+} from '../utils/monitoring';
 
 function optionalNumber(value: string) {
   const trimmed = value.trim();
@@ -89,6 +96,14 @@ export function DevicePage() {
   }, [refresh]);
 
   useEffect(() => {
+    if (!token || !companyId || !deviceId) return;
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [token, companyId, deviceId, refresh]);
+
+  useEffect(() => {
     if (!device) return;
     const hash = window.location.hash;
     if (hash === '#device-key' || hash === '#device-settings') {
@@ -109,7 +124,7 @@ export function DevicePage() {
     (reading: Reading) => {
       setReadings((current) => prependReading(current, reading));
       setDevice((current) =>
-        current && current.id === reading.deviceId
+        current && current.id.toLowerCase() === reading.deviceId.toLowerCase()
           ? { ...current, lastReadingAtUtc: reading.measuredAtUtc }
           : current,
       );
@@ -153,11 +168,12 @@ export function DevicePage() {
     });
     setSimulating(false);
 
-    if (!response.success) {
+    if (!response.success || !response.data) {
       pushToast(response.message ?? 'Ingest failed', 'error');
       return;
     }
 
+    handleReading(response.data);
     pushToast('Environmental reading ingested', 'success');
   }
 
@@ -195,8 +211,9 @@ export function DevicePage() {
     );
   }
 
+  const lastReadingAt = getDeviceLastReadingAt(device, readings);
   const status = getDeviceStatus(device, readings, now);
-  const latest = readings[0];
+  const latest = getLatestReading(readings, device.id);
 
   return (
     <section className="stack">
@@ -230,7 +247,11 @@ export function DevicePage() {
           label="Status"
           value={status.label}
           tone={status.tone === 'danger' ? 'danger' : status.tone === 'ok' ? 'ok' : status.tone === 'warning' ? 'warning' : 'default'}
-          hint={status.tone === 'warning' ? 'No reading for 30+ minutes' : undefined}
+          hint={
+            status.tone === 'warning'
+              ? `Last reading ${formatDateTime(lastReadingAt ?? device.lastReadingAtUtc)} — no new data for 30+ min`
+              : undefined
+          }
         />
         <StatCard label="Temperature" value={formatMetric(latest?.temperatureC, '°C')} />
         <StatCard label="Humidity" value={formatMetric(latest?.humidityPct, '%')} />
@@ -238,7 +259,7 @@ export function DevicePage() {
         <StatCard label="Light" value={formatMetric(latest?.lightLevelLux, ' lux')} />
         <StatCard label="Noise" value={formatMetric(latest?.noiseLevelDb, ' dB')} />
         <StatCard label="Battery" value={formatMetric(latest?.batteryLevelPct, '%')} />
-        <StatCard label="Last reading" value={formatDateTime(device.lastReadingAtUtc)} />
+        <StatCard label="Last reading" value={formatDateTime(lastReadingAt ?? device.lastReadingAtUtc)} />
       </div>
 
       {canManageDevices && (
@@ -329,8 +350,9 @@ export function DevicePage() {
       )}
 
       <div className="card stack">
-        <h2>Temperature history</h2>
-        <TemperatureChart readings={readings} minTempC={device.minTempC} maxTempC={device.maxTempC} />
+        <h2>Environmental history</h2>
+        <p className="muted small">Green bands show each sensor&apos;s configured safe range.</p>
+        <EnvironmentalCharts device={device} readings={readings} />
       </div>
 
       <div className="card stack">

@@ -4,13 +4,22 @@ import { api } from '../api/client';
 import type { Device, DeviceCreated, Reading } from '../api/types';
 import { StatCard } from '../components/StatCard';
 import { AlertAcknowledgeButton } from '../components/AlertAcknowledgeButton';
-import { TemperatureChart } from '../components/TemperatureChart';
+import { EnvironmentalCharts } from '../components/EnvironmentalCharts';
 import { useToast } from '../components/Toast';
 import { useCompanyData } from '../hooks/useCompanyData';
 import { useAuth } from '../auth/AuthContext';
 import { DeviceThresholdFields } from '../components/DeviceThresholdFields';
 import { DEVICE_THRESHOLD_DEFAULTS, parseDeviceThresholdPayload } from '../constants/deviceDefaults';
-import { canManageCompanyDevices, copyToClipboard, deviceCardClass, deviceStatusRowClass, formatDateTime, getDeviceStatus } from '../utils/monitoring';
+import {
+  canManageCompanyDevices,
+  copyToClipboard,
+  deviceCardClass,
+  deviceStatusRowClass,
+  formatDateTime,
+  getDeviceLastReadingAt,
+  getDeviceStatus,
+  getReadingsForDevice,
+} from '../utils/monitoring';
 import { useMonitoringClock } from '../hooks/useMonitoringClock';
 
 type Tab = 'overview' | 'devices' | 'readings' | 'alerts' | 'team';
@@ -194,14 +203,14 @@ export function CompanyPage() {
       {tab === 'overview' && (
         <div className="grid two-col">
           <div className="card stack">
-            <h2>Temperature trend</h2>
+            <h2>Environmental trends</h2>
             {chartDevice ? (
               <>
                 <p className="muted small">Latest device: {chartDevice.name}</p>
-                <TemperatureChart readings={chartReadings} minTempC={chartDevice.minTempC} maxTempC={chartDevice.maxTempC} />
+                <EnvironmentalCharts device={chartDevice} readings={chartReadings} compact />
               </>
             ) : (
-              <p className="muted">Add a device to see temperature trends.</p>
+              <p className="muted">Add a device to see environmental trends.</p>
             )}
           </div>
           <div className="stack">
@@ -450,7 +459,9 @@ function DeviceCard({
   onDelete?: () => void;
 }) {
   const now = useMonitoringClock();
-  const status = getDeviceStatus(device, readings, now);
+  const deviceReadings = getReadingsForDevice(readings, device.id);
+  const status = getDeviceStatus(device, deviceReadings, now);
+  const lastReadingAt = getDeviceLastReadingAt(device, deviceReadings);
 
   return (
     <div className={`device-card${deviceCardClass(status.tone)}`}>
@@ -462,7 +473,7 @@ function DeviceCard({
         <p className="muted">{device.zoneName}</p>
         <p>Range: {device.minTempC}°C – {device.maxTempC}°C</p>
         {status.latestTemp !== undefined && <p className="temp-reading">{status.latestTemp}°C</p>}
-        <p className="muted small">Last: {formatDateTime(device.lastReadingAtUtc)}</p>
+        <p className="muted small">Last: {formatDateTime(lastReadingAt ?? device.lastReadingAtUtc)}</p>
       </Link>
       {canManageDevices && onDelete && (
         <div className="device-card-actions">

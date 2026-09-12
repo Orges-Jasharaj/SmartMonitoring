@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Alert, Company, CompanySummary, CompanyUser, Device, Reading } from '../api/types';
-import { getDeviceStatus, summarizeDeviceStatuses, type DeviceStatus } from '../utils/monitoring';
+import {
+  getDeviceLastReadingAt,
+  getDeviceStatus,
+  getReadingsForDevice,
+  parseUtcDateTime,
+  summarizeDeviceStatuses,
+  type DeviceStatus,
+} from '../utils/monitoring';
 import { useMonitoringClock } from './useMonitoringClock';
+import { prependReading, updateDeviceLastReading } from '../realtime/monitoringHub';
 import { useMonitoringHub } from './useMonitoringHub';
 
 export type GlobalDevice = {
@@ -10,6 +18,7 @@ export type GlobalDevice = {
   companyId: string;
   companyName: string;
   status: DeviceStatus;
+  lastReadingAt: Date | null;
 };
 
 export type GlobalAlert = {
@@ -30,7 +39,7 @@ async function loadCompanyMonitoring(token: string, company: Company) {
     api.getDevices(token, company.id),
     api.getAlerts(token, company.id, true),
     api.getAlerts(token, company.id, false),
-    api.getReadings(token, company.id, undefined, 50),
+    api.getReadings(token, company.id, undefined, 200),
     api.getCompanyUsers(token, company.id),
   ]);
 
@@ -117,7 +126,8 @@ export function useGlobalMonitoring(token: string | null) {
         .flatMap((item) => item.alerts)
         .sort(
           (a, b) =>
-            new Date(b.alert.triggeredAtUtc).getTime() - new Date(a.alert.triggeredAtUtc).getTime(),
+            (parseUtcDateTime(b.alert.triggeredAtUtc)?.getTime() ?? 0) -
+            (parseUtcDateTime(a.alert.triggeredAtUtc)?.getTime() ?? 0),
         ),
     );
     setAlertHistory(
@@ -125,7 +135,8 @@ export function useGlobalMonitoring(token: string | null) {
         .flatMap((item) => item.alertHistory)
         .sort(
           (a, b) =>
-            new Date(b.alert.triggeredAtUtc).getTime() - new Date(a.alert.triggeredAtUtc).getTime(),
+            (parseUtcDateTime(b.alert.triggeredAtUtc)?.getTime() ?? 0) -
+            (parseUtcDateTime(a.alert.triggeredAtUtc)?.getTime() ?? 0),
         ),
     );
     setLoading(false);
@@ -141,12 +152,41 @@ export function useGlobalMonitoring(token: string | null) {
     }, 400);
   }, [refresh]);
 
+  const handleReading = useCallback(
+    (reading: Reading) => {
+      setReadingsByCompanyId((current) => ({
+        ...current,
+        [reading.companyId]: prependReading(current[reading.companyId] ?? [], reading, 100),
+      }));
+      setDeviceRows((current) =>
+        current.map((row) =>
+          row.device.id.toLowerCase() === reading.deviceId.toLowerCase()
+            ? {
+                ...row,
+                device: updateDeviceLastReading([row.device], reading.deviceId, reading.measuredAtUtc)[0],
+              }
+            : row,
+        ),
+      );
+      scheduleRefresh();
+    },
+    [scheduleRefresh],
+  );
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!token) return;
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [token, refresh]);
+
   useMonitoringHub({
-    onReading: scheduleRefresh,
+    onReading: handleReading,
     onAlert: scheduleRefresh,
   });
 
@@ -181,10 +221,15 @@ export function useGlobalMonitoring(token: string | null) {
   const devices = useMemo(
     () =>
       deviceRows
-        .map((row) => ({
-          ...row,
-          status: getDeviceStatus(row.device, readingsByCompanyId[row.companyId] ?? [], now),
-        }))
+        .map((row) => {
+          const companyReadings = readingsByCompanyId[row.companyId] ?? [];
+          const deviceReadings = getReadingsForDevice(companyReadings, row.device.id);
+          return {
+            ...row,
+            status: getDeviceStatus(row.device, deviceReadings, now),
+            lastReadingAt: getDeviceLastReadingAt(row.device, deviceReadings),
+          };
+        })
         .sort((a, b) => {
           const toneDiff = deviceToneOrder[a.status.tone] - deviceToneOrder[b.status.tone];
           if (toneDiff !== 0) return toneDiff;

@@ -202,7 +202,7 @@ export function DevicesPage() {
           )}
 
           <ul className="status-list">
-            {devices.map(({ device, companyId, companyName, status }) => {
+            {devices.map(({ device, companyId, companyName, status, lastReadingAt: deviceLastReadingAt }) => {
               const canManage = canManageCompany(companyId);
               return (
                 <li key={device.id}>
@@ -247,7 +247,10 @@ export function DevicesPage() {
                       </div>
                     )}
                   </div>
-                  <p className="muted small device-row-meta">Last reading {formatDateTime(device.lastReadingAtUtc)}</p>
+                  <p className="muted small device-row-meta">
+                    Last reading {deviceLastReadingAt ? formatDateTime(deviceLastReadingAt) : 'never'}
+                    {status.tone === 'warning' ? ' · no new data for 30+ min' : ''}
+                  </p>
                 </li>
               );
             })}

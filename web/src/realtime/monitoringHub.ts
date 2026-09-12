@@ -8,6 +8,33 @@ type Subscriber = {
   onAlert?: (alert: Alert) => void;
 };
 
+function readString(raw: Record<string, unknown>, camel: string, pascal: string) {
+  const value = raw[camel] ?? raw[pascal];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readNumber(raw: Record<string, unknown>, camel: string, pascal: string) {
+  const value = raw[camel] ?? raw[pascal];
+  return typeof value === 'number' ? value : undefined;
+}
+
+/** SignalR payloads may use PascalCase; REST uses camelCase. */
+export function normalizeReading(raw: Record<string, unknown>): Reading {
+  return {
+    id: readString(raw, 'id', 'Id') ?? '',
+    deviceId: readString(raw, 'deviceId', 'DeviceId') ?? '',
+    companyId: readString(raw, 'companyId', 'CompanyId') ?? '',
+    temperatureC: readNumber(raw, 'temperatureC', 'TemperatureC') ?? 0,
+    humidityPct: readNumber(raw, 'humidityPct', 'HumidityPct') ?? null,
+    co2Ppm: readNumber(raw, 'co2Ppm', 'Co2Ppm') ?? null,
+    lightLevelLux: readNumber(raw, 'lightLevelLux', 'LightLevelLux') ?? null,
+    noiseLevelDb: readNumber(raw, 'noiseLevelDb', 'NoiseLevelDb') ?? null,
+    batteryLevelPct: readNumber(raw, 'batteryLevelPct', 'BatteryLevelPct') ?? null,
+    measuredAtUtc: readString(raw, 'measuredAtUtc', 'MeasuredAtUtc') ?? '',
+    receivedAtUtc: readString(raw, 'receivedAtUtc', 'ReceivedAtUtc') ?? '',
+  };
+}
+
 let connection: signalR.HubConnection | null = null;
 let activeToken: string | null = null;
 let subscriberId = 0;
@@ -18,10 +45,23 @@ function notifyConnection(connected: boolean) {
   connectionListeners.forEach((listener) => listener(connected));
 }
 
-function dispatchReading(reading: Reading) {
+function dispatchReading(raw: Record<string, unknown>) {
+  const reading = normalizeReading(raw);
   subscribers.forEach((subscriber) => {
-    if (subscriber.companyId && subscriber.companyId !== reading.companyId) return;
-    if (subscriber.deviceId && subscriber.deviceId !== reading.deviceId) return;
+    if (
+      subscriber.companyId &&
+      subscriber.companyId.toLowerCase() !== reading.companyId.toLowerCase()
+    ) {
+      return;
+    }
+
+    if (
+      subscriber.deviceId &&
+      subscriber.deviceId.toLowerCase() !== reading.deviceId.toLowerCase()
+    ) {
+      return;
+    }
+
     subscriber.onReading?.(reading);
   });
 }
@@ -119,7 +159,10 @@ export function updateDeviceLastReading<T extends { id: string; lastReadingAtUtc
   deviceId: string,
   measuredAtUtc: string,
 ) {
+  const normalizedDeviceId = deviceId.toLowerCase();
   return devices.map((device) =>
-    device.id === deviceId ? { ...device, lastReadingAtUtc: measuredAtUtc } : device,
+    device.id.toLowerCase() === normalizedDeviceId
+      ? { ...device, lastReadingAtUtc: measuredAtUtc }
+      : device,
   );
 }

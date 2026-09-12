@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using SmartMonitoring.Shared.Audit;
 using SmartMonitoring.Shared.Notifications;
+using SmartMonitoring.Shared.Json;
 using SmartMonitoring.Shared.Observability;
 using System.Text;
 
@@ -43,8 +44,10 @@ try
     builder.Services.AddScoped<IReadingRetentionService, ReadingRetentionService>();
     builder.Services.AddHostedService<ReadingRetentionCleanupService>();
 
-    builder.Services.AddSignalR();
-    builder.Services.AddControllers();
+    builder.Services.AddSignalR()
+        .AddJsonProtocol(options => options.PayloadSerializerOptions.ApplySmartMonitoringDefaults());
+    builder.Services.AddControllers()
+        .AddJsonOptions(options => options.JsonSerializerOptions.ApplySmartMonitoringDefaults());
     builder.Services.AddSwaggerGen(c =>
     {
         c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme

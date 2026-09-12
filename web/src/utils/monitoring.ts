@@ -8,25 +8,59 @@ export type DeviceStatus = {
   label: string;
   tone: DeviceStatusTone;
   latestTemp?: number;
+  lastReadingAt?: Date | null;
 };
 
-export function getLatestReading(readings: Reading[], deviceId: string): Reading | undefined {
-  return readings
-    .filter((r) => r.deviceId === deviceId)
-    .sort((a, b) => new Date(b.measuredAtUtc).getTime() - new Date(a.measuredAtUtc).getTime())[0];
+/** Backend sends UTC timestamps without a Z suffix; treat bare ISO strings as UTC. */
+export function parseUtcDateTime(value?: string | Date | null): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const normalized =
+    /[Zz]$/.test(trimmed) || /[+-]\d{2}:\d{2}$/.test(trimmed) ? trimmed : `${trimmed}Z`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function getReadingsForDevice(readings: Reading[], deviceId: string): Reading[] {
+  const normalizedDeviceId = deviceId.toLowerCase();
+  return readings.filter((reading) => reading.deviceId?.toLowerCase() === normalizedDeviceId);
+}
+
+export function getLatestReading(readings: Reading[], deviceId?: string): Reading | undefined {
+  const normalizedDeviceId = deviceId?.toLowerCase();
+  const scopedReadings = normalizedDeviceId
+    ? getReadingsForDevice(readings, normalizedDeviceId)
+    : readings;
+
+  return [...scopedReadings].sort(
+    (a, b) =>
+      (parseUtcDateTime(b.measuredAtUtc)?.getTime() ?? 0) -
+      (parseUtcDateTime(a.measuredAtUtc)?.getTime() ?? 0),
+  )[0];
 }
 
 export function getDeviceLastReadingAt(device: Device, readings: Reading[]): Date | null {
-  const latest = getLatestReading(readings, device.id);
-  const timestamps = [latest?.measuredAtUtc, device.lastReadingAtUtc].filter(Boolean) as string[];
+  const deviceReadings = getReadingsForDevice(readings, device.id);
+  const times = deviceReadings
+    .map((reading) => parseUtcDateTime(reading.measuredAtUtc)?.getTime())
+    .filter((value): value is number => value !== undefined);
 
-  if (timestamps.length === 0) {
+  const deviceTime = parseUtcDateTime(device.lastReadingAtUtc)?.getTime();
+  if (deviceTime !== undefined) {
+    times.push(deviceTime);
+  }
+
+  if (times.length === 0) {
     return null;
   }
 
-  return new Date(
-    Math.max(...timestamps.map((value) => new Date(value).getTime())),
-  );
+  return new Date(Math.max(...times));
 }
 
 export function isDeviceOffline(lastReadingAt: Date | null, now = new Date()) {
@@ -42,7 +76,7 @@ export function getDeviceStatus(device: Device, readings: Reading[], now = new D
   const lastReadingAt = getDeviceLastReadingAt(device, readings);
 
   if (!lastReadingAt) {
-    return { label: 'No data', tone: 'muted' };
+    return { label: 'No data', tone: 'muted', lastReadingAt: null };
   }
 
   if (isDeviceOffline(lastReadingAt, now)) {
@@ -50,18 +84,19 @@ export function getDeviceStatus(device: Device, readings: Reading[], now = new D
       label: 'Offline',
       tone: 'warning',
       latestTemp: latest?.temperatureC,
+      lastReadingAt,
     };
   }
 
   if (!latest) {
-    return { label: 'No data', tone: 'muted' };
+    return { label: 'No data', tone: 'muted', lastReadingAt };
   }
 
   if (latest.temperatureC < device.minTempC || latest.temperatureC > device.maxTempC) {
-    return { label: 'Out of range', tone: 'danger', latestTemp: latest.temperatureC };
+    return { label: 'Out of range', tone: 'danger', latestTemp: latest.temperatureC, lastReadingAt };
   }
 
-  return { label: 'OK', tone: 'ok', latestTemp: latest.temperatureC };
+  return { label: 'OK', tone: 'ok', latestTemp: latest.temperatureC, lastReadingAt };
 }
 
 export function summarizeDeviceStatuses(devices: Device[], readings: Reading[], now = new Date()) {
@@ -105,9 +140,10 @@ export function deviceCardClass(tone: DeviceStatusTone) {
   return '';
 }
 
-export function formatDateTime(value?: string | null) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString();
+export function formatDateTime(value?: string | Date | null) {
+  const date = parseUtcDateTime(value);
+  if (!date) return '—';
+  return date.toLocaleString();
 }
 
 export async function copyToClipboard(text: string) {
