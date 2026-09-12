@@ -26,12 +26,25 @@ export type Device = {
   zoneName: string;
   minTempC: number;
   maxTempC: number;
+  minHumidityPct: number;
+  maxHumidityPct: number;
+  minCo2Ppm: number;
+  maxCo2Ppm: number;
+  minLightLevelLux: number;
+  maxLightLevelLux: number;
+  minNoiseLevelDb: number;
+  maxNoiseLevelDb: number;
+  minBatteryPct: number;
   isActive: boolean;
   lastReadingAtUtc?: string | null;
   createdAtUtc: string;
 };
 
 export type DeviceCreated = Device & {
+  deviceKey: string;
+};
+
+export type DeviceKey = {
   deviceKey: string;
 };
 
@@ -52,8 +65,22 @@ export type Reading = {
   deviceId: string;
   companyId: string;
   temperatureC: number;
+  humidityPct?: number | null;
+  co2Ppm?: number | null;
+  lightLevelLux?: number | null;
+  noiseLevelDb?: number | null;
+  batteryLevelPct?: number | null;
   measuredAtUtc: string;
   receivedAtUtc: string;
+};
+
+export type IngestReadingPayload = {
+  temperatureC: number;
+  humidityPct?: number;
+  co2Ppm?: number;
+  lightLevelLux?: number;
+  noiseLevelDb?: number;
+  batteryLevelPct?: number;
 };
 
 export type User = {

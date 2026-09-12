@@ -103,9 +103,6 @@ export function AlertNotificationBell() {
                       </div>
                       <p className="muted small">{companyName}</p>
                       <p className="small">{alert.message}</p>
-                      {alert.temperatureC != null && (
-                        <p className="small danger-text">{alert.temperatureC}°C</p>
-                      )}
                       <p className="muted small">{formatDateTime(alert.triggeredAtUtc)}</p>
                     </Link>
                     <AlertAcknowledgeButton

@@ -6,6 +6,8 @@ import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 import { useGlobalMonitoring } from '../hooks/useGlobalMonitoring';
+import { DeviceThresholdFields } from '../components/DeviceThresholdFields';
+import { DEVICE_THRESHOLD_DEFAULTS, parseDeviceThresholdPayload } from '../constants/deviceDefaults';
 import { canManageCompanyDevices, copyToClipboard, deviceStatusRowClass, formatDateTime } from '../utils/monitoring';
 
 export function DevicesPage() {
@@ -21,8 +23,7 @@ export function DevicesPage() {
     companyId: '',
     name: '',
     zoneName: '',
-    minTempC: '2',
-    maxTempC: '8',
+    ...DEVICE_THRESHOLD_DEFAULTS,
   });
   const [creating, setCreating] = useState(false);
   const [createdDevice, setCreatedDevice] = useState<DeviceCreated | null>(null);
@@ -43,8 +44,7 @@ export function DevicesPage() {
     const response = await api.createDevice(token, selectedCompanyId, {
       name: deviceForm.name.trim(),
       zoneName: deviceForm.zoneName.trim(),
-      minTempC: Number(deviceForm.minTempC),
-      maxTempC: Number(deviceForm.maxTempC),
+      ...parseDeviceThresholdPayload(deviceForm),
     });
     setCreating(false);
 
@@ -58,8 +58,7 @@ export function DevicesPage() {
       companyId: selectedCompanyId,
       name: '',
       zoneName: '',
-      minTempC: '2',
-      maxTempC: '8',
+      ...DEVICE_THRESHOLD_DEFAULTS,
     });
     pushToast(`Device "${response.data.name}" created`, 'success');
     await refresh();
@@ -160,28 +159,10 @@ export function DevicesPage() {
               required
             />
           </label>
-          <div className="inline-fields">
-            <label>
-              Min °C
-              <input
-                type="number"
-                step="0.1"
-                value={deviceForm.minTempC}
-                onChange={(e) => setDeviceForm((current) => ({ ...current, minTempC: e.target.value }))}
-                required
-              />
-            </label>
-            <label>
-              Max °C
-              <input
-                type="number"
-                step="0.1"
-                value={deviceForm.maxTempC}
-                onChange={(e) => setDeviceForm((current) => ({ ...current, maxTempC: e.target.value }))}
-                required
-              />
-            </label>
-          </div>
+          <DeviceThresholdFields
+            form={deviceForm}
+            onChange={(next) => setDeviceForm((current) => ({ ...current, ...next }))}
+          />
           <button type="submit" className="btn btn-primary" disabled={creating || !selectedCompanyId}>
             {creating ? 'Creating…' : 'Create device'}
           </button>
@@ -243,6 +224,12 @@ export function DevicesPage() {
                     </Link>
                     {canManage && (
                       <div className="status-row-actions">
+                        <Link
+                          to={`/companies/${companyId}/devices/${device.id}#device-key`}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Device key
+                        </Link>
                         <Link
                           to={`/companies/${companyId}/devices/${device.id}#device-settings`}
                           className="btn btn-ghost btn-sm"

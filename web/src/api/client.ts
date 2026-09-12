@@ -5,6 +5,8 @@ import type {
   CompanyUser,
   Device,
   DeviceCreated,
+  DeviceKey,
+  IngestReadingPayload,
   JwtResult,
   PagedAuditLogs,
   Reading,
@@ -126,7 +128,21 @@ export const api = {
   createDevice(
     token: string,
     companyId: string,
-    payload: { name: string; zoneName: string; minTempC: number; maxTempC: number },
+    payload: {
+      name: string;
+      zoneName: string;
+      minTempC: number;
+      maxTempC: number;
+      minHumidityPct: number;
+      maxHumidityPct: number;
+      minCo2Ppm: number;
+      maxCo2Ppm: number;
+      minLightLevelLux: number;
+      maxLightLevelLux: number;
+      minNoiseLevelDb: number;
+      maxNoiseLevelDb: number;
+      minBatteryPct: number;
+    },
   ) {
     return request<DeviceCreated>(`/monitoring/api/companies/${companyId}/devices`, {
       method: 'POST',
@@ -142,11 +158,29 @@ export const api = {
     });
   },
 
+  getDeviceKey(token: string, companyId: string, deviceId: string) {
+    return request<DeviceKey>(`/monitoring/api/companies/${companyId}/devices/${deviceId}/key`, { token });
+  },
+
   updateDevice(
     token: string,
     companyId: string,
     deviceId: string,
-    payload: { name: string; zoneName: string; minTempC: number; maxTempC: number },
+    payload: {
+      name: string;
+      zoneName: string;
+      minTempC: number;
+      maxTempC: number;
+      minHumidityPct: number;
+      maxHumidityPct: number;
+      minCo2Ppm: number;
+      maxCo2Ppm: number;
+      minLightLevelLux: number;
+      maxLightLevelLux: number;
+      minNoiseLevelDb: number;
+      maxNoiseLevelDb: number;
+      minBatteryPct: number;
+    },
   ) {
     return request<Device>(`/monitoring/api/companies/${companyId}/devices/${deviceId}`, {
       method: 'PUT',
@@ -175,11 +209,11 @@ export const api = {
     return request<Reading[]>(`/monitoring/api/companies/${companyId}/readings?${params}`, { token });
   },
 
-  ingestReading(deviceKey: string, temperatureC: number) {
+  ingestReading(deviceKey: string, payload: IngestReadingPayload) {
     return request<Reading>('/monitoring/api/ingest/readings', {
       method: 'POST',
       headers: { 'X-Device-Key': deviceKey },
-      body: { temperatureC },
+      body: payload,
     });
   },
 

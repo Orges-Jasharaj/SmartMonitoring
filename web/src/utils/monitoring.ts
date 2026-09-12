@@ -133,3 +133,15 @@ export function canManageCompanyDevices(
       member.userId.toLowerCase() === normalizedUserId && member.role === 'CompanyAdmin',
   );
 }
+
+export function formatMetric(
+  value: number | null | undefined,
+  suffix: string,
+  fallback = '—',
+) {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  return `${value}${suffix}`;
+}

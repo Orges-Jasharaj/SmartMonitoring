@@ -26,24 +26,8 @@ public class SendAlertNotificationHandler(IEmailSender emailSender) : IRequestHa
             return ResponseDto<int>.Failure("No recipient emails were provided.");
         }
 
-        var isCritical = notification.AlertType.Contains("OutOfRange", StringComparison.OrdinalIgnoreCase);
-        var isReminder = notification.Message.Contains("still outside", StringComparison.OrdinalIgnoreCase);
-        var subject = isCritical
-            ? isReminder
-                ? $"[ALERT] {notification.DeviceName} temperature still out of range"
-                : $"[ALERT] {notification.DeviceName} temperature out of range"
-            : $"[OK] {notification.DeviceName} temperature normalized";
-
-        var htmlBody = $"""
-            <h2>{subject}</h2>
-            <p><strong>Device:</strong> {notification.DeviceName}</p>
-            <p><strong>Zone:</strong> {notification.ZoneName}</p>
-            <p><strong>Message:</strong> {notification.Message}</p>
-            <p><strong>Temperature:</strong> {notification.TemperatureC}°C</p>
-            <p><strong>Time (UTC):</strong> {notification.TriggeredAtUtc:yyyy-MM-dd HH:mm:ss}</p>
-            <hr />
-            <p style="color:#666;font-size:12px;">SmartMonitoring alert notification</p>
-            """;
+        var subject = AlertEmailFormatter.BuildSubject(notification);
+        var htmlBody = AlertEmailFormatter.BuildHtmlBody(notification, subject);
 
         var sent = 0;
         foreach (var recipient in recipients)

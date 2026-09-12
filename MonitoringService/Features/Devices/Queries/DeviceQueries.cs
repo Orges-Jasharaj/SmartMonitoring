@@ -13,3 +13,9 @@ public class GetDeviceByIdQuery : IRequest<ResponseDto<DeviceDto>>
 {
     public Guid Id { get; set; }
 }
+
+public class GetDeviceKeyQuery : IRequest<ResponseDto<DeviceKeyDto>>
+{
+    public Guid CompanyId { get; set; }
+    public Guid DeviceId { get; set; }
+}

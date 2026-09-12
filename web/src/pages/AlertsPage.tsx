@@ -79,9 +79,6 @@ export function AlertsPage() {
                     <span className={`pill ${alert.isActive ? 'pill-danger' : 'pill-muted'}`}>{alert.alertType}</span>
                   </div>
                   <p className="small">{alert.message}</p>
-                  {alert.temperatureC != null && (
-                    <p className={`small${alert.isActive ? ' danger-text' : ''}`}>{alert.temperatureC}°C</p>
-                  )}
                   <p className="muted small">Triggered {formatDateTime(alert.triggeredAtUtc)}</p>
                   {!alert.isActive && alert.resolvedAtUtc && (
                     <p className="muted small">Resolved {formatDateTime(alert.resolvedAtUtc)}</p>

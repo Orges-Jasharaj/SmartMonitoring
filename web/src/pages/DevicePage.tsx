@@ -9,7 +9,17 @@ import { useAuth } from '../auth/AuthContext';
 import { useMonitoringHub } from '../hooks/useMonitoringHub';
 import { useMonitoringClock } from '../hooks/useMonitoringClock';
 import { prependReading } from '../realtime/monitoringHub';
-import { canManageCompanyDevices, formatDateTime, getDeviceStatus } from '../utils/monitoring';
+import { DeviceKeyPanel } from '../components/DeviceKeyPanel';
+import { DeviceThresholdFields } from '../components/DeviceThresholdFields';
+import { deviceThresholdFormFromDevice, parseDeviceThresholdPayload } from '../constants/deviceDefaults';
+import { canManageCompanyDevices, formatDateTime, formatMetric, getDeviceStatus } from '../utils/monitoring';
+
+function optionalNumber(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 export function DevicePage() {
   const { companyId = '', deviceId = '' } = useParams();
@@ -22,7 +32,14 @@ export function DevicePage() {
   const [members, setMembers] = useState<CompanyUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [deviceKey, setDeviceKey] = useState('');
-  const [simulateTemp, setSimulateTemp] = useState('6');
+  const [simulateForm, setSimulateForm] = useState({
+    temperatureC: '6',
+    humidityPct: '55',
+    co2Ppm: '450',
+    lightLevelLux: '120',
+    noiseLevelDb: '42',
+    batteryLevelPct: '88',
+  });
   const [simulating, setSimulating] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
@@ -30,7 +47,17 @@ export function DevicePage() {
     zoneName: '',
     minTempC: '',
     maxTempC: '',
+    minHumidityPct: '',
+    maxHumidityPct: '',
+    minCo2Ppm: '',
+    maxCo2Ppm: '',
+    minLightLevelLux: '',
+    maxLightLevelLux: '',
+    minNoiseLevelDb: '',
+    maxNoiseLevelDb: '',
+    minBatteryPct: '',
   });
+
   const refresh = useCallback(async () => {
     if (!token || !companyId || !deviceId) return;
     setError(null);
@@ -45,8 +72,7 @@ export function DevicePage() {
       setSettingsForm({
         name: deviceRes.data.name,
         zoneName: deviceRes.data.zoneName,
-        minTempC: String(deviceRes.data.minTempC),
-        maxTempC: String(deviceRes.data.maxTempC),
+        ...deviceThresholdFormFromDevice(deviceRes.data),
       });
     } else {
       setDevice(null);
@@ -61,6 +87,14 @@ export function DevicePage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!device) return;
+    const hash = window.location.hash;
+    if (hash === '#device-key' || hash === '#device-settings') {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [device]);
 
   useEffect(() => {
     if (!token || !companyId) return;
@@ -109,7 +143,14 @@ export function DevicePage() {
     }
 
     setSimulating(true);
-    const response = await api.ingestReading(deviceKey.trim(), Number(simulateTemp));
+    const response = await api.ingestReading(deviceKey.trim(), {
+      temperatureC: Number(simulateForm.temperatureC),
+      humidityPct: optionalNumber(simulateForm.humidityPct),
+      co2Ppm: optionalNumber(simulateForm.co2Ppm),
+      lightLevelLux: optionalNumber(simulateForm.lightLevelLux),
+      noiseLevelDb: optionalNumber(simulateForm.noiseLevelDb),
+      batteryLevelPct: optionalNumber(simulateForm.batteryLevelPct),
+    });
     setSimulating(false);
 
     if (!response.success) {
@@ -117,7 +158,7 @@ export function DevicePage() {
       return;
     }
 
-    pushToast(`Reading ${simulateTemp}°C ingested`, 'success');
+    pushToast('Environmental reading ingested', 'success');
   }
 
   async function handleUpdateSettings(event: FormEvent) {
@@ -128,8 +169,7 @@ export function DevicePage() {
     const response = await api.updateDevice(token, companyId, deviceId, {
       name: settingsForm.name.trim(),
       zoneName: settingsForm.zoneName.trim(),
-      minTempC: Number(settingsForm.minTempC),
-      maxTempC: Number(settingsForm.maxTempC),
+      ...parseDeviceThresholdPayload(settingsForm),
     });
     setSavingSettings(false);
 
@@ -156,6 +196,7 @@ export function DevicePage() {
   }
 
   const status = getDeviceStatus(device, readings, now);
+  const latest = readings[0];
 
   return (
     <section className="stack">
@@ -163,9 +204,16 @@ export function DevicePage() {
         <div>
           <Link to={`/companies/${companyId}`} className="back-link">← Back to company</Link>
           <h1>{device.name}</h1>
-          <p className="muted">{device.zoneName} · Safe range {device.minTempC}°C – {device.maxTempC}°C</p>
+          <p className="muted">
+            {device.zoneName} · Temp {device.minTempC}–{device.maxTempC}°C · Humidity {device.minHumidityPct}–{device.maxHumidityPct}% · CO₂ {device.minCo2Ppm}–{device.maxCo2Ppm} ppm
+          </p>
         </div>
         <div className="header-actions">
+          {canManageDevices && (
+            <a href="#device-key" className="btn btn-secondary">
+              Device key
+            </a>
+          )}
           {canManageDevices && (
             <button type="button" className="btn btn-ghost" onClick={() => void handleDeleteDevice()}>
               Delete device
@@ -184,15 +232,28 @@ export function DevicePage() {
           tone={status.tone === 'danger' ? 'danger' : status.tone === 'ok' ? 'ok' : status.tone === 'warning' ? 'warning' : 'default'}
           hint={status.tone === 'warning' ? 'No reading for 30+ minutes' : undefined}
         />
-        <StatCard label="Latest temp" value={status.latestTemp !== undefined ? `${status.latestTemp}°C` : '—'} />
-        <StatCard label="Readings loaded" value={readings.length} />
+        <StatCard label="Temperature" value={formatMetric(latest?.temperatureC, '°C')} />
+        <StatCard label="Humidity" value={formatMetric(latest?.humidityPct, '%')} />
+        <StatCard label="CO₂" value={formatMetric(latest?.co2Ppm, ' ppm')} />
+        <StatCard label="Light" value={formatMetric(latest?.lightLevelLux, ' lux')} />
+        <StatCard label="Noise" value={formatMetric(latest?.noiseLevelDb, ' dB')} />
+        <StatCard label="Battery" value={formatMetric(latest?.batteryLevelPct, '%')} />
         <StatCard label="Last reading" value={formatDateTime(device.lastReadingAtUtc)} />
       </div>
 
       {canManageDevices && (
+        <DeviceKeyPanel
+          companyId={companyId}
+          deviceId={deviceId}
+          deviceKey={deviceKey}
+          onDeviceKeyChange={setDeviceKey}
+        />
+      )}
+
+      {canManageDevices && (
         <form id="device-settings" className="card stack" onSubmit={handleUpdateSettings}>
           <h2>Device settings</h2>
-          <p className="muted small">Update name, zone, and safe temperature range.</p>
+          <p className="muted small">Update identity, zone, and alert thresholds for all sensors.</p>
           <label>
             Name
             <input
@@ -209,53 +270,63 @@ export function DevicePage() {
               required
             />
           </label>
-          <div className="inline-fields">
-            <label>
-              Min °C
-              <input
-                type="number"
-                step="0.1"
-                value={settingsForm.minTempC}
-                onChange={(e) => setSettingsForm((f) => ({ ...f, minTempC: e.target.value }))}
-                required
-              />
-            </label>
-            <label>
-              Max °C
-              <input
-                type="number"
-                step="0.1"
-                value={settingsForm.maxTempC}
-                onChange={(e) => setSettingsForm((f) => ({ ...f, maxTempC: e.target.value }))}
-                required
-              />
-            </label>
-          </div>
+          <DeviceThresholdFields
+            form={settingsForm}
+            onChange={(next) => setSettingsForm((current) => ({ ...current, ...next }))}
+          />
           <button type="submit" className="btn btn-primary" disabled={savingSettings}>
             {savingSettings ? 'Saving…' : 'Save settings'}
           </button>
         </form>
       )}
 
+      {canManageDevices && (
       <div className="card stack">
         <h2>Simulate IoT reading</h2>
         <p className="muted small">
-          Test ingest without Postman. Paste the device key saved when this device was created.
+          Show the device key above first, then send a simulated environmental payload. Leave optional fields blank to omit them.
         </p>
         <form className="stack" onSubmit={handleSimulateReading}>
           <label>
-            Device key
-            <input value={deviceKey} onChange={(e) => setDeviceKey(e.target.value)} placeholder="Paste X-Device-Key value" required />
+            X-Device-Key
+            <input value={deviceKey} onChange={(e) => setDeviceKey(e.target.value)} placeholder="Show device key above or paste here" required />
           </label>
-          <label>
-            Temperature (°C)
-            <input type="number" step="0.1" value={simulateTemp} onChange={(e) => setSimulateTemp(e.target.value)} required />
-          </label>
-          <button type="submit" className="btn btn-secondary" disabled={simulating}>
+          <div className="inline-fields">
+            <label>
+              Temperature (°C)
+              <input type="number" step="0.1" value={simulateForm.temperatureC} onChange={(e) => setSimulateForm((f) => ({ ...f, temperatureC: e.target.value }))} required />
+            </label>
+            <label>
+              Humidity (%)
+              <input type="number" step="0.1" value={simulateForm.humidityPct} onChange={(e) => setSimulateForm((f) => ({ ...f, humidityPct: e.target.value }))} />
+            </label>
+          </div>
+          <div className="inline-fields">
+            <label>
+              CO₂ (ppm)
+              <input type="number" step="1" value={simulateForm.co2Ppm} onChange={(e) => setSimulateForm((f) => ({ ...f, co2Ppm: e.target.value }))} />
+            </label>
+            <label>
+              Light (lux)
+              <input type="number" step="1" value={simulateForm.lightLevelLux} onChange={(e) => setSimulateForm((f) => ({ ...f, lightLevelLux: e.target.value }))} />
+            </label>
+          </div>
+          <div className="inline-fields">
+            <label>
+              Noise (dB)
+              <input type="number" step="0.1" value={simulateForm.noiseLevelDb} onChange={(e) => setSimulateForm((f) => ({ ...f, noiseLevelDb: e.target.value }))} />
+            </label>
+            <label>
+              Battery (%)
+              <input type="number" step="1" value={simulateForm.batteryLevelPct} onChange={(e) => setSimulateForm((f) => ({ ...f, batteryLevelPct: e.target.value }))} />
+            </label>
+          </div>
+          <button type="submit" className="btn btn-secondary" disabled={simulating || !deviceKey.trim()}>
             {simulating ? 'Sending…' : 'Send reading'}
           </button>
         </form>
       </div>
+      )}
 
       <div className="card stack">
         <h2>Temperature history</h2>
@@ -269,17 +340,25 @@ export function DevicePage() {
           <table>
             <thead>
               <tr>
-                <th>Temperature</th>
+                <th>Temp</th>
+                <th>Humidity</th>
+                <th>CO₂</th>
+                <th>Light</th>
+                <th>Noise</th>
+                <th>Battery</th>
                 <th>Measured</th>
-                <th>Received</th>
               </tr>
             </thead>
             <tbody>
               {readings.map((reading) => (
                 <tr key={reading.id}>
                   <td>{reading.temperatureC}°C</td>
+                  <td>{formatMetric(reading.humidityPct, '%', '—')}</td>
+                  <td>{formatMetric(reading.co2Ppm, ' ppm', '—')}</td>
+                  <td>{formatMetric(reading.lightLevelLux, ' lux', '—')}</td>
+                  <td>{formatMetric(reading.noiseLevelDb, ' dB', '—')}</td>
+                  <td>{formatMetric(reading.batteryLevelPct, '%', '—')}</td>
                   <td>{formatDateTime(reading.measuredAtUtc)}</td>
-                  <td>{formatDateTime(reading.receivedAtUtc)}</td>
                 </tr>
               ))}
             </tbody>

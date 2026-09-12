@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MonitoringService.Data;
 
@@ -11,9 +12,11 @@ using MonitoringService.Data;
 namespace MonitoringService.Data.Migrations
 {
     [DbContext(typeof(MonitoringDbContext))]
-    partial class MonitoringDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912102447_AddEnvironmentalMetrics")]
+    partial class AddEnvironmentalMetrics
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -157,16 +160,7 @@ namespace MonitoringService.Data.Migrations
                     b.Property<decimal>("MinBatteryPct")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<decimal>("MinCo2Ppm")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<decimal>("MinHumidityPct")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("MinLightLevelLux")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("MinNoiseLevelDb")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("MinTempC")

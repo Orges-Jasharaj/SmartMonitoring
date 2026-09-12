@@ -62,7 +62,13 @@ public class AlertNotificationDispatcher(
             {
                 await notificationPublisher.PublishAlertAsync(request, cancellationToken);
 
-                if (alert.AlertType is AlertTypes.TemperatureOutOfRange or AlertTypes.DeviceOffline)
+                if (alert.AlertType is AlertTypes.TemperatureOutOfRange
+                    or AlertTypes.HumidityOutOfRange
+                    or AlertTypes.Co2OutOfRange
+                    or AlertTypes.LowBattery
+                    or AlertTypes.LightLevelOutOfRange
+                    or AlertTypes.NoiseLevelOutOfRange
+                    or AlertTypes.DeviceOffline)
                 {
                     alert.LastNotifiedAtUtc = DateTime.UtcNow;
                     anyNotified = true;

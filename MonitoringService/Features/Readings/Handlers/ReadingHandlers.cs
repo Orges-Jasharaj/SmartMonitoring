@@ -41,15 +41,20 @@ public class IngestReadingHandler(
             DeviceId = device.Id,
             CompanyId = device.CompanyId,
             TemperatureC = request.TemperatureC,
+            HumidityPct = request.HumidityPct,
+            Co2Ppm = request.Co2Ppm,
+            LightLevelLux = request.LightLevelLux,
+            NoiseLevelDb = request.NoiseLevelDb,
+            BatteryLevelPct = request.BatteryLevelPct,
             MeasuredAtUtc = measuredAt,
             ReceivedAtUtc = DateTime.UtcNow
         };
 
         device.LastReadingAtUtc = measuredAt;
         dbContext.TemperatureReadings.Add(reading);
-        var temperatureAlerts = await alertEvaluator.EvaluateReadingAsync(device, request.TemperatureC, cancellationToken);
+        var metricAlerts = await alertEvaluator.EvaluateReadingAsync(device, request, cancellationToken);
         var offlineAlerts = await deviceOfflineEvaluator.EvaluateDeviceReadingAsync(device, cancellationToken);
-        var alertsToNotify = temperatureAlerts.Concat(offlineAlerts).ToList();
+        var alertsToNotify = metricAlerts.Concat(offlineAlerts).ToList();
         await dbContext.SaveChangesAsync(cancellationToken);
         await alertNotificationDispatcher.DispatchAsync(device, alertsToNotify, cancellationToken);
 
@@ -74,6 +79,11 @@ public class IngestReadingHandler(
         DeviceId = reading.DeviceId,
         CompanyId = reading.CompanyId,
         TemperatureC = reading.TemperatureC,
+        HumidityPct = reading.HumidityPct,
+        Co2Ppm = reading.Co2Ppm,
+        LightLevelLux = reading.LightLevelLux,
+        NoiseLevelDb = reading.NoiseLevelDb,
+        BatteryLevelPct = reading.BatteryLevelPct,
         MeasuredAtUtc = reading.MeasuredAtUtc,
         ReceivedAtUtc = reading.ReceivedAtUtc
     };

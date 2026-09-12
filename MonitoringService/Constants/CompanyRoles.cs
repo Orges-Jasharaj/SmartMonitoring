@@ -17,5 +17,15 @@ public static class AlertTypes
 {
     public const string TemperatureOutOfRange = "TemperatureOutOfRange";
     public const string TemperatureNormalized = "TemperatureNormalized";
+    public const string HumidityOutOfRange = "HumidityOutOfRange";
+    public const string HumidityNormalized = "HumidityNormalized";
+    public const string Co2OutOfRange = "Co2OutOfRange";
+    public const string Co2Normalized = "Co2Normalized";
+    public const string LowBattery = "LowBattery";
+    public const string BatteryNormalized = "BatteryNormalized";
+    public const string LightLevelOutOfRange = "LightLevelOutOfRange";
+    public const string LightLevelNormalized = "LightLevelNormalized";
+    public const string NoiseLevelOutOfRange = "NoiseLevelOutOfRange";
+    public const string NoiseLevelNormalized = "NoiseLevelNormalized";
     public const string DeviceOffline = "DeviceOffline";
 }

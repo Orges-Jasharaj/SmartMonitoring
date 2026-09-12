@@ -20,7 +20,16 @@ public class DevicesController(IMediator mediator) : ControllerBase
             Name = request.Name,
             ZoneName = request.ZoneName,
             MinTempC = request.MinTempC,
-            MaxTempC = request.MaxTempC
+            MaxTempC = request.MaxTempC,
+            MinHumidityPct = request.MinHumidityPct,
+            MaxHumidityPct = request.MaxHumidityPct,
+            MinCo2Ppm = request.MinCo2Ppm,
+            MaxCo2Ppm = request.MaxCo2Ppm,
+            MinLightLevelLux = request.MinLightLevelLux,
+            MaxLightLevelLux = request.MaxLightLevelLux,
+            MinNoiseLevelDb = request.MinNoiseLevelDb,
+            MaxNoiseLevelDb = request.MaxNoiseLevelDb,
+            MinBatteryPct = request.MinBatteryPct
         });
 
         if (!response.Success) return BadRequest(response);
@@ -31,6 +40,19 @@ public class DevicesController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> GetByCompany(Guid companyId)
     {
         var response = await mediator.Send(new GetDevicesByCompanyQuery { CompanyId = companyId });
+        if (!response.Success) return BadRequest(response);
+        return Ok(response);
+    }
+
+    [HttpGet("{deviceId:guid}/key")]
+    public async Task<IActionResult> GetKey(Guid companyId, Guid deviceId)
+    {
+        var response = await mediator.Send(new GetDeviceKeyQuery
+        {
+            CompanyId = companyId,
+            DeviceId = deviceId
+        });
+
         if (!response.Success) return BadRequest(response);
         return Ok(response);
     }
@@ -58,7 +80,16 @@ public class DevicesController(IMediator mediator) : ControllerBase
             Name = request.Name,
             ZoneName = request.ZoneName,
             MinTempC = request.MinTempC,
-            MaxTempC = request.MaxTempC
+            MaxTempC = request.MaxTempC,
+            MinHumidityPct = request.MinHumidityPct,
+            MaxHumidityPct = request.MaxHumidityPct,
+            MinCo2Ppm = request.MinCo2Ppm,
+            MaxCo2Ppm = request.MaxCo2Ppm,
+            MinLightLevelLux = request.MinLightLevelLux,
+            MaxLightLevelLux = request.MaxLightLevelLux,
+            MinNoiseLevelDb = request.MinNoiseLevelDb,
+            MaxNoiseLevelDb = request.MaxNoiseLevelDb,
+            MinBatteryPct = request.MinBatteryPct
         });
 
         if (!response.Success) return BadRequest(response);
@@ -80,18 +111,29 @@ public class DeviceDetailsController(IMediator mediator) : ControllerBase
     }
 }
 
-public class CreateDeviceRequest
+public class DeviceThresholdRequest
 {
-    public string Name { get; set; } = null!;
-    public string ZoneName { get; set; } = null!;
     public decimal MinTempC { get; set; }
     public decimal MaxTempC { get; set; }
+    public decimal MinHumidityPct { get; set; } = 40;
+    public decimal MaxHumidityPct { get; set; } = 70;
+    public decimal MinCo2Ppm { get; set; } = 400;
+    public decimal MaxCo2Ppm { get; set; } = 1000;
+    public decimal MinLightLevelLux { get; set; } = 0;
+    public decimal MaxLightLevelLux { get; set; } = 500;
+    public decimal MinNoiseLevelDb { get; set; } = 35;
+    public decimal MaxNoiseLevelDb { get; set; } = 70;
+    public decimal MinBatteryPct { get; set; } = 20;
 }
 
-public class UpdateDeviceRequest
+public class CreateDeviceRequest : DeviceThresholdRequest
 {
     public string Name { get; set; } = null!;
     public string ZoneName { get; set; } = null!;
-    public decimal MinTempC { get; set; }
-    public decimal MaxTempC { get; set; }
+}
+
+public class UpdateDeviceRequest : DeviceThresholdRequest
+{
+    public string Name { get; set; } = null!;
+    public string ZoneName { get; set; } = null!;
 }

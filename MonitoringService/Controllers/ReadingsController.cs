@@ -52,6 +52,11 @@ public class IngestController(IMediator mediator) : ControllerBase
         {
             DeviceKey = deviceKey.ToString(),
             TemperatureC = request.TemperatureC,
+            HumidityPct = request.HumidityPct,
+            Co2Ppm = request.Co2Ppm,
+            LightLevelLux = request.LightLevelLux,
+            NoiseLevelDb = request.NoiseLevelDb,
+            BatteryLevelPct = request.BatteryLevelPct,
             MeasuredAtUtc = request.MeasuredAtUtc
         });
 
@@ -63,5 +68,10 @@ public class IngestController(IMediator mediator) : ControllerBase
 public class IngestReadingRequest
 {
     public decimal TemperatureC { get; set; }
+    public decimal? HumidityPct { get; set; }
+    public decimal? Co2Ppm { get; set; }
+    public decimal? LightLevelLux { get; set; }
+    public decimal? NoiseLevelDb { get; set; }
+    public decimal? BatteryLevelPct { get; set; }
     public DateTime? MeasuredAtUtc { get; set; }
 }

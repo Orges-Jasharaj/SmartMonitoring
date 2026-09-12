@@ -10,6 +10,15 @@ public class CreateDeviceCommand : IRequest<ResponseDto<DeviceCreatedDto>>
     public string ZoneName { get; set; } = null!;
     public decimal MinTempC { get; set; }
     public decimal MaxTempC { get; set; }
+    public decimal MinHumidityPct { get; set; }
+    public decimal MaxHumidityPct { get; set; }
+    public decimal MinCo2Ppm { get; set; }
+    public decimal MaxCo2Ppm { get; set; }
+    public decimal MinLightLevelLux { get; set; }
+    public decimal MaxLightLevelLux { get; set; }
+    public decimal MinNoiseLevelDb { get; set; }
+    public decimal MaxNoiseLevelDb { get; set; }
+    public decimal MinBatteryPct { get; set; }
 }
 
 public class DeleteDeviceCommand : IRequest<ResponseDto<bool>>
@@ -26,6 +35,15 @@ public class UpdateDeviceCommand : IRequest<ResponseDto<DeviceDto>>
     public string ZoneName { get; set; } = null!;
     public decimal MinTempC { get; set; }
     public decimal MaxTempC { get; set; }
+    public decimal MinHumidityPct { get; set; }
+    public decimal MaxHumidityPct { get; set; }
+    public decimal MinCo2Ppm { get; set; }
+    public decimal MaxCo2Ppm { get; set; }
+    public decimal MinLightLevelLux { get; set; }
+    public decimal MaxLightLevelLux { get; set; }
+    public decimal MinNoiseLevelDb { get; set; }
+    public decimal MaxNoiseLevelDb { get; set; }
+    public decimal MinBatteryPct { get; set; }
 }
 
 public class DeviceDto
@@ -36,12 +54,26 @@ public class DeviceDto
     public string ZoneName { get; set; } = null!;
     public decimal MinTempC { get; set; }
     public decimal MaxTempC { get; set; }
+    public decimal MinHumidityPct { get; set; }
+    public decimal MaxHumidityPct { get; set; }
+    public decimal MinCo2Ppm { get; set; }
+    public decimal MaxCo2Ppm { get; set; }
+    public decimal MinLightLevelLux { get; set; }
+    public decimal MaxLightLevelLux { get; set; }
+    public decimal MinNoiseLevelDb { get; set; }
+    public decimal MaxNoiseLevelDb { get; set; }
+    public decimal MinBatteryPct { get; set; }
     public bool IsActive { get; set; }
     public DateTime? LastReadingAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }
 
 public class DeviceCreatedDto : DeviceDto
+{
+    public string DeviceKey { get; set; } = null!;
+}
+
+public class DeviceKeyDto
 {
     public string DeviceKey { get; set; } = null!;
 }
