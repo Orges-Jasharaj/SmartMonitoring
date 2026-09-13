@@ -87,18 +87,6 @@ public class IngestReadingHandler(
         await realtimeNotifier.NotifyReadingAsync(readingDto, cancellationToken);
         await realtimeNotifier.NotifyAlertsAsync(device.CompanyId, alertsToNotify, cancellationToken);
 
-        var auditDetail = shouldPersist
-            ? $"{request.TemperatureC}C"
-            : $"{request.TemperatureC}C (accepted, not persisted)";
-
-        await auditRecorder.RecordAsync(
-            "ReadingIngested",
-            "Success",
-            targetEntityType: "Device",
-            targetEntityId: device.Id.ToString(),
-            detail: auditDetail,
-            cancellationToken: cancellationToken);
-
         var message = shouldPersist ? "Reading recorded" : "Reading accepted";
         return ResponseDto<ReadingDto>.SuccessResponse(readingDto, message);
     }

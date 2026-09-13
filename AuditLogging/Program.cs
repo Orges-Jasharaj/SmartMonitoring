@@ -1,5 +1,6 @@
 using AuditLogging.Data;
 using AuditLogging.Middleware;
+using AuditLogging.Services;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -51,6 +52,9 @@ try
     builder.Services.AddAuthorization();
 
     builder.Services.Configure<AuditApiKeyOptions>(builder.Configuration.GetSection(AuditApiKeyOptions.SectionName));
+    builder.Services.Configure<AuditRetentionOptions>(builder.Configuration.GetSection(AuditRetentionOptions.SectionName));
+    builder.Services.AddScoped<IAuditRetentionService, AuditRetentionService>();
+    builder.Services.AddHostedService<AuditRetentionCleanupService>();
 
     builder.Services.AddDbContext<AuditDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
