@@ -16,7 +16,8 @@ public class IngestReadingHandler(
     IDeviceOfflineEvaluator deviceOfflineEvaluator,
     IAlertNotificationDispatcher alertNotificationDispatcher,
     IRealtimeNotifier realtimeNotifier,
-    IAuditRecorder auditRecorder) : IRequestHandler<IngestReadingCommand, ResponseDto<ReadingDto>>
+    IAuditRecorder auditRecorder,
+    IReadingPersistencePolicy readingPersistencePolicy) : IRequestHandler<IngestReadingCommand, ResponseDto<ReadingDto>>
 {
     public async Task<ResponseDto<ReadingDto>> Handle(IngestReadingCommand request, CancellationToken cancellationToken)
     {
@@ -35,43 +36,91 @@ public class IngestReadingHandler(
         }
 
         var measuredAt = request.MeasuredAtUtc ?? DateTime.UtcNow;
-        var reading = new TemperatureReading
-        {
-            Id = Guid.NewGuid(),
-            DeviceId = device.Id,
-            CompanyId = device.CompanyId,
-            TemperatureC = request.TemperatureC,
-            HumidityPct = request.HumidityPct,
-            Co2Ppm = request.Co2Ppm,
-            LightLevelLux = request.LightLevelLux,
-            NoiseLevelDb = request.NoiseLevelDb,
-            BatteryLevelPct = request.BatteryLevelPct,
-            MeasuredAtUtc = measuredAt,
-            ReceivedAtUtc = DateTime.UtcNow
-        };
+        var receivedAt = DateTime.UtcNow;
+
+        var lastPersistedReading = await dbContext.TemperatureReadings
+            .Where(r => r.DeviceId == device.Id)
+            .OrderByDescending(r => r.MeasuredAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
 
         device.LastReadingAtUtc = measuredAt;
-        dbContext.TemperatureReadings.Add(reading);
+
         var metricAlerts = await alertEvaluator.EvaluateReadingAsync(device, request, cancellationToken);
         var offlineAlerts = await deviceOfflineEvaluator.EvaluateDeviceReadingAsync(device, cancellationToken);
         var alertsToNotify = metricAlerts.Concat(offlineAlerts).ToList();
+
+        var shouldPersist = readingPersistencePolicy.ShouldPersist(
+            device,
+            request,
+            lastPersistedReading,
+            measuredAt,
+            request.ForcePersist);
+
+        TemperatureReading? reading = null;
+        if (shouldPersist)
+        {
+            reading = new TemperatureReading
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = device.Id,
+                CompanyId = device.CompanyId,
+                TemperatureC = request.TemperatureC,
+                HumidityPct = request.HumidityPct,
+                Co2Ppm = request.Co2Ppm,
+                LightLevelLux = request.LightLevelLux,
+                NoiseLevelDb = request.NoiseLevelDb,
+                BatteryLevelPct = request.BatteryLevelPct,
+                MeasuredAtUtc = measuredAt,
+                ReceivedAtUtc = receivedAt
+            };
+
+            dbContext.TemperatureReadings.Add(reading);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         await alertNotificationDispatcher.DispatchAsync(device, alertsToNotify, cancellationToken);
 
-        var readingDto = Map(reading);
+        var readingDto = reading != null
+            ? Map(reading)
+            : MapEphemeral(device, request, measuredAt, receivedAt);
+
         await realtimeNotifier.NotifyReadingAsync(readingDto, cancellationToken);
         await realtimeNotifier.NotifyAlertsAsync(device.CompanyId, alertsToNotify, cancellationToken);
+
+        var auditDetail = shouldPersist
+            ? $"{request.TemperatureC}C"
+            : $"{request.TemperatureC}C (accepted, not persisted)";
 
         await auditRecorder.RecordAsync(
             "ReadingIngested",
             "Success",
             targetEntityType: "Device",
             targetEntityId: device.Id.ToString(),
-            detail: $"{request.TemperatureC}C",
+            detail: auditDetail,
             cancellationToken: cancellationToken);
 
-        return ResponseDto<ReadingDto>.SuccessResponse(readingDto, "Reading recorded");
+        var message = shouldPersist ? "Reading recorded" : "Reading accepted";
+        return ResponseDto<ReadingDto>.SuccessResponse(readingDto, message);
     }
+
+    internal static ReadingDto MapEphemeral(
+        Device device,
+        IngestReadingCommand request,
+        DateTime measuredAtUtc,
+        DateTime receivedAtUtc) => new()
+    {
+        Id = Guid.NewGuid(),
+        DeviceId = device.Id,
+        CompanyId = device.CompanyId,
+        TemperatureC = request.TemperatureC,
+        HumidityPct = request.HumidityPct,
+        Co2Ppm = request.Co2Ppm,
+        LightLevelLux = request.LightLevelLux,
+        NoiseLevelDb = request.NoiseLevelDb,
+        BatteryLevelPct = request.BatteryLevelPct,
+        MeasuredAtUtc = measuredAtUtc,
+        ReceivedAtUtc = receivedAtUtc
+    };
 
     internal static ReadingDto Map(TemperatureReading reading) => new()
     {

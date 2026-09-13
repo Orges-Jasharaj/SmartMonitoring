@@ -48,6 +48,8 @@ public class IngestController(IMediator mediator) : ControllerBase
             return Unauthorized(SmartMonitoring.Shared.Dtos.Responses.ResponseDto<object>.Failure("Device key is required."));
         }
 
+        var forcePersist = Request.Headers.ContainsKey("X-Force-Persist");
+
         var response = await mediator.Send(new IngestReadingCommand
         {
             DeviceKey = deviceKey.ToString(),
@@ -57,7 +59,8 @@ public class IngestController(IMediator mediator) : ControllerBase
             LightLevelLux = request.LightLevelLux,
             NoiseLevelDb = request.NoiseLevelDb,
             BatteryLevelPct = request.BatteryLevelPct,
-            MeasuredAtUtc = request.MeasuredAtUtc
+            MeasuredAtUtc = request.MeasuredAtUtc,
+            ForcePersist = forcePersist
         });
 
         if (!response.Success) return BadRequest(response);

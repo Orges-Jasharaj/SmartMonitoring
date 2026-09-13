@@ -109,6 +109,8 @@ services:
       ReadingRetention__Enabled: "true"
       ReadingRetention__RetentionDays: "90"
       ReadingRetention__CleanupIntervalHours: "24"
+      ReadingPersistence__Enabled: "true"
+      ReadingPersistence__HeartbeatMinutes: "5"
       Identity__BaseUrl: http://identity-service:8080
     depends_on:
       - sqlserver

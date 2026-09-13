@@ -209,10 +209,13 @@ export const api = {
     return request<Reading[]>(`/monitoring/api/companies/${companyId}/readings?${params}`, { token });
   },
 
-  ingestReading(deviceKey: string, payload: IngestReadingPayload) {
+  ingestReading(deviceKey: string, payload: IngestReadingPayload, forcePersist = true) {
     return request<Reading>('/monitoring/api/ingest/readings', {
       method: 'POST',
-      headers: { 'X-Device-Key': deviceKey },
+      headers: {
+        'X-Device-Key': deviceKey,
+        ...(forcePersist ? { 'X-Force-Persist': '1' } : {}),
+      },
       body: payload,
     });
   },

@@ -25,6 +25,7 @@ try
     builder.Services.AddNotificationPublishing(builder.Configuration);
     builder.Services.Configure<AlertOptions>(builder.Configuration.GetSection(AlertOptions.SectionName));
     builder.Services.Configure<ReadingRetentionOptions>(builder.Configuration.GetSection(ReadingRetentionOptions.SectionName));
+    builder.Services.Configure<ReadingPersistenceOptions>(builder.Configuration.GetSection(ReadingPersistenceOptions.SectionName));
 
     builder.Services.Configure<IdentityOptions>(builder.Configuration.GetSection(IdentityOptions.SectionName));
     builder.Services.AddHttpClient<IIdentityUserEmailResolver, IdentityUserEmailResolver>((serviceProvider, client) =>
@@ -42,6 +43,7 @@ try
     builder.Services.AddSingleton<IRealtimeNotifier, RealtimeNotifier>();
     builder.Services.AddHostedService<DeviceOfflineMonitorService>();
     builder.Services.AddScoped<IReadingRetentionService, ReadingRetentionService>();
+    builder.Services.AddScoped<IReadingPersistencePolicy, ReadingPersistencePolicy>();
     builder.Services.AddHostedService<ReadingRetentionCleanupService>();
 
     builder.Services.AddSignalR()

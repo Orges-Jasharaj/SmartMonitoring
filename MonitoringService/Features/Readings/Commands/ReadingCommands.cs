@@ -13,6 +13,9 @@ public class IngestReadingCommand : IRequest<ResponseDto<ReadingDto>>
     public decimal? NoiseLevelDb { get; set; }
     public decimal? BatteryLevelPct { get; set; }
     public DateTime? MeasuredAtUtc { get; set; }
+
+    /// <summary>When true, always persist (e.g. manual simulate from the UI).</summary>
+    public bool ForcePersist { get; set; }
 }
 
 public class ReadingDto
