@@ -8,10 +8,28 @@ public sealed class UtcDateTimeConverter : JsonConverter<DateTime>
 {
     public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
+        var text = reader.GetString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new JsonException("Expected a DateTime string.");
+        }
+
+        var trimmed = text.Trim();
+
+        if (DateTime.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
+        {
+            return parsed.Kind switch
+            {
+                DateTimeKind.Utc => parsed,
+                DateTimeKind.Local => parsed.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(parsed, DateTimeKind.Utc),
+            };
+        }
+
         return DateTime.Parse(
-            reader.GetString()!,
+            trimmed,
             CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind | DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
     }
 
     public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)

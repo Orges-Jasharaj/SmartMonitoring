@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using SmartMonitoring.Shared.Audit;
+using SmartMonitoring.Shared.Data;
 using SmartMonitoring.Shared.Notifications;
 using SmartMonitoring.Shared.Json;
 using SmartMonitoring.Shared.Observability;
@@ -153,7 +154,8 @@ try
         if (config.GetValue<bool>("Database:RunMigrationsOnStartup"))
         {
             var db = scope.ServiceProvider.GetRequiredService<MonitoringDbContext>();
-            db.Database.Migrate();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            db.MigrateWithRetry(logger);
         }
     }
 
@@ -162,6 +164,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "MonitoringService terminated unexpectedly");
+    Environment.Exit(1);
 }
 finally
 {

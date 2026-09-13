@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using SmartMonitoring.Shared.Data;
 using SmartMonitoring.Shared.Messaging;
 using SmartMonitoring.Shared.Observability;
 using System.Text;
@@ -97,7 +98,8 @@ try
         if (config.GetValue<bool>("Database:RunMigrationsOnStartup"))
         {
             var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-            db.Database.Migrate();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            db.MigrateWithRetry(logger);
         }
     }
 
@@ -106,6 +108,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "AuditLogging terminated unexpectedly");
+    Environment.Exit(1);
 }
 finally
 {

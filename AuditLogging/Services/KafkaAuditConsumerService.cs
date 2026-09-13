@@ -66,7 +66,7 @@ public class KafkaAuditConsumerService(
         {
             auditEvent = JsonSerializer.Deserialize<AuditEvent>(result.Message.Value, KafkaJson.SerializerOptions);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or ArgumentException)
         {
             logger.LogError(
                 ex,

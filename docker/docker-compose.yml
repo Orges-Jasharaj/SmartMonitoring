@@ -1,6 +1,7 @@
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
     ports:
       - "1433:1433"
     environment:
@@ -8,12 +9,22 @@ services:
       MSSQL_SA_PASSWORD: "SmartMonitoring@123"
     volumes:
       - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'SmartMonitoring@123' -C -Q 'SELECT 1' > /dev/null 2>&1 || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'SmartMonitoring@123' -Q 'SELECT 1' > /dev/null 2>&1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
 
   identity-service:
     build:
       context: ..
       dockerfile: Dockerfile
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
@@ -44,14 +55,26 @@ services:
       Email__ConfirmationBaseUrl: http://localhost:8088/identity/api/authentication/confirm-email
       Email__ResetPasswordBaseUrl: http://localhost:8088/identity/reset-password
     depends_on:
-      - sqlserver
-      - loki
-      - tempo
-      - kafka
-      - mailpit
+      sqlserver:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 180s
 
   mailpit:
     image: axllent/mailpit:latest
+    restart: unless-stopped
     ports:
       - "8025:8025"
       - "1025:1025"
@@ -59,6 +82,7 @@ services:
   kafka:
     image: apache/kafka:latest
     container_name: kafka
+    restart: unless-stopped
     ports:
       - "9092:9092"
     environment:
@@ -74,22 +98,34 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
     ports:
       - "8089:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: smartmonitoring
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
 
   api-gateway:
     build:
       context: ..
       dockerfile: ApiGateway/Dockerfile
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8088:8088"
     environment:
@@ -103,18 +139,30 @@ services:
       ReverseProxy__Clusters__monitoring-cluster__Destinations__destination1__Address: http://monitoring-service:8082/
       ReverseProxy__Clusters__notification-cluster__Destinations__destination1__Address: http://notification-service:8083/
     depends_on:
-      - identity-service
-      - audit-logging
-      - monitoring-service
-      - notification-service
-      - loki
-      - tempo
+      identity-service:
+        condition: service_healthy
+      audit-logging:
+        condition: service_healthy
+      monitoring-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8088'"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 30s
 
   monitoring-service:
     build:
       context: ..
       dockerfile: MonitoringService/Dockerfile
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8082:8082"
     environment:
@@ -149,17 +197,28 @@ services:
       ReadingPersistence__HeartbeatMinutes: "5"
       Identity__BaseUrl: http://identity-service:8080
     depends_on:
-      - sqlserver
-      - loki
-      - tempo
-      - kafka
-      - identity-service
+      sqlserver:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8082'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 180s
 
   notification-service:
     build:
       context: ..
       dockerfile: NotificationService/Dockerfile
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8083:8083"
     environment:
@@ -178,16 +237,26 @@ services:
       Kafka__Enabled: "true"
       Kafka__BootstrapServers: kafka:9092
     depends_on:
-      - mailpit
-      - loki
-      - tempo
-      - kafka
+      mailpit:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8083'"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 60s
 
   audit-logging:
     build:
       context: ..
       dockerfile: AuditLogging/Dockerfile
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8081:8081"
     environment:
@@ -208,13 +277,24 @@ services:
       Kafka__Enabled: "true"
       Kafka__BootstrapServers: kafka:9092
     depends_on:
-      - sqlserver
-      - loki
-      - tempo
-      - kafka
+      sqlserver:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8081'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 180s
 
   loki:
     image: grafana/loki:3.0.0
+    restart: unless-stopped
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/loki-config.yml
@@ -224,6 +304,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.53.0
+    restart: unless-stopped
     ports:
       - "9090:9090"
     command:
@@ -233,10 +314,12 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     depends_on:
-      - identity-service
+      identity-service:
+        condition: service_healthy
 
   tempo:
     image: grafana/tempo:2.5.0
+    restart: unless-stopped
     command: ["-config.file=/etc/tempo/tempo.yml"]
     ports:
       - "3200:3200"
@@ -247,6 +330,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.0.0
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
@@ -257,20 +341,25 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - grafana-data:/var/lib/grafana
     depends_on:
-      - loki
-      - prometheus
-      - tempo
-      - identity-service
+      loki:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      tempo:
+        condition: service_started
+      identity-service:
+        condition: service_healthy
 
   web:
     build:
       context: ..
       dockerfile: web/Dockerfile
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_healthy
 
 volumes:
   sqlserver-data:

@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using SmartMonitoring.Shared.Middleware;
 using SmartMonitoring.Shared.Audit;
+using SmartMonitoring.Shared.Data;
 using SmartMonitoring.Shared.Observability;
 using System;
 using System.Text;
@@ -190,8 +191,7 @@ using (var scope = app.Services.CreateScope())
     if (config.GetValue<bool>("Database:RunMigrationsOnStartup"))
     {
         var db = services.GetRequiredService<IdentityAppDbContext>();
-        db.Database.Migrate();
-        logger.LogInformation("Database migrations applied.");
+        db.MigrateWithRetry(logger);
     }
 
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
@@ -261,6 +261,7 @@ app.Run();
 catch (Exception ex)
 {
     Log.Fatal(ex, "IdentityService terminated unexpectedly");
+    Environment.Exit(1);
 }
 finally
 {
