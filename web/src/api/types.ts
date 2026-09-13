@@ -134,9 +134,11 @@ export type AuditLog = {
   occurredAtUtc: string;
 };
 
-export type PagedAuditLogs = {
-  items: AuditLog[];
+export type PagedResult<T> = {
+  items: T[];
   page: number;
   pageSize: number;
   totalCount: number;
 };
+
+export type PagedAuditLogs = PagedResult<AuditLog>;

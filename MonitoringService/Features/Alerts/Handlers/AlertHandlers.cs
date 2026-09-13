@@ -5,20 +5,23 @@ using MonitoringService.Services;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SmartMonitoring.Shared.Audit;
+using SmartMonitoring.Shared.Dtos;
 using SmartMonitoring.Shared.Dtos.Responses;
 
 namespace MonitoringService.Features.Alerts.Handlers;
 
 public class GetAlertsHandler(
     MonitoringDbContext dbContext,
-    ICompanyAccessService companyAccess) : IRequestHandler<GetAlertsQuery, ResponseDto<IReadOnlyList<AlertDto>>>
+    ICompanyAccessService companyAccess) : IRequestHandler<GetAlertsQuery, ResponseDto<PagedResult<AlertDto>>>
 {
-    public async Task<ResponseDto<IReadOnlyList<AlertDto>>> Handle(GetAlertsQuery request, CancellationToken cancellationToken)
+    public async Task<ResponseDto<PagedResult<AlertDto>>> Handle(GetAlertsQuery request, CancellationToken cancellationToken)
     {
         if (!await companyAccess.CanAccessCompanyAsync(request.CompanyId, cancellationToken))
         {
-            return ResponseDto<IReadOnlyList<AlertDto>>.Failure("Company not found or access denied.");
+            return ResponseDto<PagedResult<AlertDto>>.Failure("Company not found or access denied.");
         }
+
+        var (page, pageSize) = Pagination.Normalize(request.Page, request.PageSize);
 
         var query = dbContext.Alerts.Where(a => a.CompanyId == request.CompanyId);
         if (request.ActiveOnly)
@@ -26,23 +29,32 @@ public class GetAlertsHandler(
             query = query.Where(a => a.IsActive);
         }
 
+        var totalCount = await query.CountAsync(cancellationToken);
+
         var alerts = await query
             .OrderByDescending(a => a.TriggeredAtUtc)
-            .Take(200)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return ResponseDto<IReadOnlyList<AlertDto>>.SuccessResponse(alerts.Select(a => new AlertDto
+        return ResponseDto<PagedResult<AlertDto>>.SuccessResponse(new PagedResult<AlertDto>
         {
-            Id = a.Id,
-            DeviceId = a.DeviceId,
-            CompanyId = a.CompanyId,
-            AlertType = a.AlertType,
-            Message = a.Message,
-            TemperatureC = a.TemperatureC,
-            TriggeredAtUtc = a.TriggeredAtUtc,
-            ResolvedAtUtc = a.ResolvedAtUtc,
-            IsActive = a.IsActive
-        }).ToList());
+            Items = alerts.Select(a => new AlertDto
+            {
+                Id = a.Id,
+                DeviceId = a.DeviceId,
+                CompanyId = a.CompanyId,
+                AlertType = a.AlertType,
+                Message = a.Message,
+                TemperatureC = a.TemperatureC,
+                TriggeredAtUtc = a.TriggeredAtUtc,
+                ResolvedAtUtc = a.ResolvedAtUtc,
+                IsActive = a.IsActive
+            }).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
     }
 }
 

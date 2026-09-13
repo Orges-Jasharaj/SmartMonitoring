@@ -7,6 +7,7 @@ using MonitoringService.Services;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SmartMonitoring.Shared.Audit;
+using SmartMonitoring.Shared.Dtos;
 using SmartMonitoring.Shared.Dtos.Responses;
 
 namespace MonitoringService.Features.Devices.Handlers;
@@ -140,22 +141,40 @@ public class CreateDeviceHandler(
 
 public class GetDevicesByCompanyHandler(
     MonitoringDbContext dbContext,
-    ICompanyAccessService companyAccess) : IRequestHandler<GetDevicesByCompanyQuery, ResponseDto<IReadOnlyList<DeviceDto>>>
+    ICompanyAccessService companyAccess) : IRequestHandler<GetDevicesByCompanyQuery, ResponseDto<PagedResult<DeviceDto>>>
 {
-    public async Task<ResponseDto<IReadOnlyList<DeviceDto>>> Handle(GetDevicesByCompanyQuery request, CancellationToken cancellationToken)
+    public async Task<ResponseDto<PagedResult<DeviceDto>>> Handle(GetDevicesByCompanyQuery request, CancellationToken cancellationToken)
     {
         if (!await companyAccess.CanAccessCompanyAsync(request.CompanyId, cancellationToken))
         {
-            return ResponseDto<IReadOnlyList<DeviceDto>>.Failure("Company not found or access denied.");
+            return ResponseDto<PagedResult<DeviceDto>>.Failure("Company not found or access denied.");
         }
 
-        var devices = await dbContext.Devices
-            .Where(d => d.CompanyId == request.CompanyId)
+        var (page, pageSize) = Pagination.Normalize(request.Page, request.PageSize);
+
+        var query = dbContext.Devices.Where(d => d.CompanyId == request.CompanyId);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var term = request.Search.Trim();
+            query = query.Where(d => d.Name.Contains(term) || d.ZoneName.Contains(term));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var devices = await query
             .OrderBy(d => d.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return ResponseDto<IReadOnlyList<DeviceDto>>.SuccessResponse(
-            devices.Select(CreateDeviceHandler.Map).ToList());
+        return ResponseDto<PagedResult<DeviceDto>>.SuccessResponse(new PagedResult<DeviceDto>
+        {
+            Items = devices.Select(CreateDeviceHandler.Map).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
     }
 }
 

@@ -6,6 +6,7 @@ using MonitoringService.Services;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SmartMonitoring.Shared.Audit;
+using SmartMonitoring.Shared.Dtos;
 using SmartMonitoring.Shared.Dtos.Responses;
 
 namespace MonitoringService.Features.Readings.Handlers;
@@ -128,14 +129,16 @@ public class IngestReadingHandler(
 
 public class GetReadingsHandler(
     MonitoringDbContext dbContext,
-    ICompanyAccessService companyAccess) : IRequestHandler<GetReadingsQuery, ResponseDto<IReadOnlyList<ReadingDto>>>
+    ICompanyAccessService companyAccess) : IRequestHandler<GetReadingsQuery, ResponseDto<PagedResult<ReadingDto>>>
 {
-    public async Task<ResponseDto<IReadOnlyList<ReadingDto>>> Handle(GetReadingsQuery request, CancellationToken cancellationToken)
+    public async Task<ResponseDto<PagedResult<ReadingDto>>> Handle(GetReadingsQuery request, CancellationToken cancellationToken)
     {
         if (!await companyAccess.CanAccessCompanyAsync(request.CompanyId, cancellationToken))
         {
-            return ResponseDto<IReadOnlyList<ReadingDto>>.Failure("Company not found or access denied.");
+            return ResponseDto<PagedResult<ReadingDto>>.Failure("Company not found or access denied.");
         }
+
+        var (page, pageSize) = Pagination.Normalize(request.Page, request.PageSize);
 
         var query = dbContext.TemperatureReadings
             .Where(r => r.CompanyId == request.CompanyId);
@@ -155,13 +158,20 @@ public class GetReadingsHandler(
             query = query.Where(r => r.MeasuredAtUtc <= request.ToUtc.Value);
         }
 
-        var limit = Math.Clamp(request.Limit, 1, 1000);
+        var totalCount = await query.CountAsync(cancellationToken);
+
         var readings = await query
             .OrderByDescending(r => r.MeasuredAtUtc)
-            .Take(limit)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return ResponseDto<IReadOnlyList<ReadingDto>>.SuccessResponse(
-            readings.Select(IngestReadingHandler.Map).ToList());
+        return ResponseDto<PagedResult<ReadingDto>>.SuccessResponse(new PagedResult<ReadingDto>
+        {
+            Items = readings.Select(IngestReadingHandler.Map).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
     }
 }

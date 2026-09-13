@@ -9,6 +9,7 @@ import type {
   IngestReadingPayload,
   JwtResult,
   PagedAuditLogs,
+  PagedResult,
   Reading,
   RegisterResponse,
   User,
@@ -52,6 +53,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
   }
 
   return payload;
+}
+
+type ListQuery = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+};
+
+function withPagination(params: URLSearchParams, options: ListQuery = {}) {
+  params.set('page', String(options.page ?? 1));
+  params.set('pageSize', String(options.pageSize ?? 25));
+  if (options.search) {
+    params.set('search', options.search);
+  }
+  return params;
 }
 
 export const api = {
@@ -121,8 +137,9 @@ export const api = {
     });
   },
 
-  getDevices(token: string, companyId: string) {
-    return request<Device[]>(`/monitoring/api/companies/${companyId}/devices`, { token });
+  getDevices(token: string, companyId: string, options: ListQuery = {}) {
+    const params = withPagination(new URLSearchParams(), options);
+    return request<PagedResult<Device>>(`/monitoring/api/companies/${companyId}/devices?${params}`, { token });
   },
 
   createDevice(
@@ -189,9 +206,14 @@ export const api = {
     });
   },
 
-  getAlerts(token: string, companyId: string, activeOnly = true) {
-    const query = activeOnly ? '?activeOnly=true' : '?activeOnly=false';
-    return request<Alert[]>(`/monitoring/api/companies/${companyId}/alerts${query}`, { token });
+  getAlerts(
+    token: string,
+    companyId: string,
+    options: ListQuery & { activeOnly?: boolean } = {},
+  ) {
+    const params = withPagination(new URLSearchParams(), options);
+    params.set('activeOnly', String(options.activeOnly ?? true));
+    return request<PagedResult<Alert>>(`/monitoring/api/companies/${companyId}/alerts?${params}`, { token });
   },
 
   acknowledgeAlert(token: string, companyId: string, alertId: string) {
@@ -201,12 +223,22 @@ export const api = {
     });
   },
 
-  getReadings(token: string, companyId: string, deviceId?: string, limit = 50) {
-    const params = new URLSearchParams({ limit: String(limit) });
-    if (deviceId) {
-      params.set('deviceId', deviceId);
+  getReadings(
+    token: string,
+    companyId: string,
+    options: ListQuery & { deviceId?: string; fromUtc?: string; toUtc?: string } = {},
+  ) {
+    const params = withPagination(new URLSearchParams(), options);
+    if (options.deviceId) {
+      params.set('deviceId', options.deviceId);
     }
-    return request<Reading[]>(`/monitoring/api/companies/${companyId}/readings?${params}`, { token });
+    if (options.fromUtc) {
+      params.set('fromUtc', options.fromUtc);
+    }
+    if (options.toUtc) {
+      params.set('toUtc', options.toUtc);
+    }
+    return request<PagedResult<Reading>>(`/monitoring/api/companies/${companyId}/readings?${params}`, { token });
   },
 
   ingestReading(deviceKey: string, payload: IngestReadingPayload, forcePersist = true) {
@@ -228,8 +260,9 @@ export const api = {
     return request<CompanyUser[]>(`/monitoring/api/companies/${companyId}/users`, { token });
   },
 
-  getUsers(token: string) {
-    return request<User[]>('/identity/api/users', { token });
+  getUsers(token: string, options: ListQuery = {}) {
+    const params = withPagination(new URLSearchParams(), options);
+    return request<PagedResult<User>>(`/identity/api/users?${params}`, { token });
   },
 
   activateUser(token: string, userId: string) {

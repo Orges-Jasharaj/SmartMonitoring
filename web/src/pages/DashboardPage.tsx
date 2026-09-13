@@ -23,8 +23,8 @@ export function DashboardPage() {
       return;
     }
 
-    void api.getUsers(token).then((response) => {
-      setUsers(response.data ?? []);
+    void api.getUsers(token, { page: 1, pageSize: 200 }).then((response) => {
+      setUsers(response.data?.items ?? []);
     });
   }, [token, isAdmin]);
 

@@ -12,12 +12,18 @@ namespace MonitoringService.Controllers;
 public class AlertsController(IMediator mediator) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetByCompany(Guid companyId, [FromQuery] bool activeOnly = true)
+    public async Task<IActionResult> GetByCompany(
+        Guid companyId,
+        [FromQuery] bool activeOnly = true,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25)
     {
         var response = await mediator.Send(new GetAlertsQuery
         {
             CompanyId = companyId,
-            ActiveOnly = activeOnly
+            ActiveOnly = activeOnly,
+            Page = page,
+            PageSize = pageSize
         });
 
         if (!response.Success) return BadRequest(response);

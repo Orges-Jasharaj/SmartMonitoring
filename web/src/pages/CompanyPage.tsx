@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Device, DeviceCreated, Reading } from '../api/types';
+import type { Alert, Device, DeviceCreated, Reading, User } from '../api/types';
 import { StatCard } from '../components/StatCard';
 import { AlertAcknowledgeButton } from '../components/AlertAcknowledgeButton';
 import { EnvironmentalCharts } from '../components/EnvironmentalCharts';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../components/Toast';
 import { useCompanyData } from '../hooks/useCompanyData';
 import { useAuth } from '../auth/AuthContext';
@@ -16,15 +17,14 @@ import {
   deviceCardClass,
   deviceStatusRowClass,
   formatDateTime,
-  getDeviceLastReadingAt,
-  getDeviceStatus,
-  getReadingsForDevice,
+  getDeviceStatusFromSnapshot,
 } from '../utils/monitoring';
 import { useMonitoringClock } from '../hooks/useMonitoringClock';
 
 type Tab = 'overview' | 'devices' | 'readings' | 'alerts' | 'team';
 
 const VALID_TABS: Tab[] = ['overview', 'devices', 'readings', 'alerts', 'team'];
+const PAGE_SIZE = 25;
 
 function parseTab(value: string | null): Tab {
   if (value && VALID_TABS.includes(value as Tab)) {
@@ -39,7 +39,7 @@ export function CompanyPage() {
   const [searchParams] = useSearchParams();
   const { token, isAdmin, userId } = useAuth();
   const { pushToast } = useToast();
-  const { company, devices, alerts, alertHistory, readings, members, users, loading, error, lastUpdated, refresh, stats } =
+  const { company, devices, alerts, members, loading, error, lastUpdated, refresh, stats } =
     useCompanyData(companyId, token);
 
   const canManageDevices = canManageCompanyDevices(isAdmin, userId, members);
@@ -53,6 +53,20 @@ export function CompanyPage() {
 
   const [showHistory, setShowHistory] = useState(false);
   const [readingDeviceFilter, setReadingDeviceFilter] = useState('');
+  const [readings, setReadings] = useState<Reading[]>([]);
+  const [readingsPage, setReadingsPage] = useState(1);
+  const [readingsTotalCount, setReadingsTotalCount] = useState(0);
+  const [readingsLoading, setReadingsLoading] = useState(false);
+  const [overviewChartReadings, setOverviewChartReadings] = useState<Reading[]>([]);
+  const [tabAlerts, setTabAlerts] = useState<Alert[]>([]);
+  const [alertsPage, setAlertsPage] = useState(1);
+  const [alertsTotalCount, setAlertsTotalCount] = useState(0);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [tabDevices, setTabDevices] = useState<Device[]>([]);
+  const [devicesPage, setDevicesPage] = useState(1);
+  const [devicesTotalCount, setDevicesTotalCount] = useState(0);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [assignUsers, setAssignUsers] = useState<User[]>([]);
   const [createdDevice, setCreatedDevice] = useState<DeviceCreated | null>(null);
   const [deviceForm, setDeviceForm] = useState({ name: '', zoneName: '', ...DEVICE_THRESHOLD_DEFAULTS });
   const [assignUserId, setAssignUserId] = useState('');
@@ -139,14 +153,80 @@ export function CompanyPage() {
     return devices.find((d) => d.id === deviceId)?.name ?? deviceId.slice(0, 8);
   }
 
-  const filteredReadings = readingDeviceFilter
-    ? readings.filter((r) => r.deviceId === readingDeviceFilter)
-    : readings;
+  useEffect(() => {
+    if (!token || !companyId || tab !== 'readings') return;
+    setReadingsLoading(true);
+    void api
+      .getReadings(token, companyId, {
+        deviceId: readingDeviceFilter || undefined,
+        page: readingsPage,
+        pageSize: PAGE_SIZE,
+      })
+      .then((response) => {
+        setReadings(response.data?.items ?? []);
+        setReadingsTotalCount(response.data?.totalCount ?? 0);
+        setReadingsPage(response.data?.page ?? readingsPage);
+        setReadingsLoading(false);
+      });
+  }, [token, companyId, tab, readingsPage, readingDeviceFilter]);
+
+  useEffect(() => {
+    if (!token || !companyId || tab !== 'alerts') return;
+    setAlertsLoading(true);
+    void api
+      .getAlerts(token, companyId, {
+        activeOnly: !showHistory,
+        page: alertsPage,
+        pageSize: PAGE_SIZE,
+      })
+      .then((response) => {
+        setTabAlerts(response.data?.items ?? []);
+        setAlertsTotalCount(response.data?.totalCount ?? 0);
+        setAlertsPage(response.data?.page ?? alertsPage);
+        setAlertsLoading(false);
+      });
+  }, [token, companyId, tab, alertsPage, showHistory]);
+
+  useEffect(() => {
+    if (!token || !companyId || tab !== 'devices') return;
+    setDevicesLoading(true);
+    void api
+      .getDevices(token, companyId, { page: devicesPage, pageSize: PAGE_SIZE })
+      .then((response) => {
+        setTabDevices(response.data?.items ?? []);
+        setDevicesTotalCount(response.data?.totalCount ?? 0);
+        setDevicesPage(response.data?.page ?? devicesPage);
+        setDevicesLoading(false);
+      });
+  }, [token, companyId, tab, devicesPage]);
+
+  useEffect(() => {
+    if (!token || tab !== 'team') return;
+    void api.getUsers(token, { page: 1, pageSize: 200 }).then((response) => {
+      setAssignUsers(response.data?.items ?? []);
+    });
+  }, [token, tab]);
+
+  useEffect(() => {
+    if (!token || !companyId || tab !== 'overview' || !devices[0]) {
+      setOverviewChartReadings([]);
+      return;
+    }
+
+    void api
+      .getReadings(token, companyId, { deviceId: devices[0].id, page: 1, pageSize: 100 })
+      .then((response) => setOverviewChartReadings(response.data?.items ?? []));
+  }, [token, companyId, tab, devices]);
+
+  useEffect(() => {
+    setReadingsPage(1);
+  }, [readingDeviceFilter]);
+
+  useEffect(() => {
+    setAlertsPage(1);
+  }, [showHistory]);
 
   const chartDevice = devices[0];
-  const chartReadings = chartDevice
-    ? readings.filter((r) => r.deviceId === chartDevice.id)
-    : [];
 
   if (loading && !company) {
     return <p className="muted page-loading">Loading company…</p>;
@@ -207,7 +287,7 @@ export function CompanyPage() {
             {chartDevice ? (
               <>
                 <p className="muted small">Latest device: {chartDevice.name}</p>
-                <EnvironmentalCharts device={chartDevice} readings={chartReadings} compact />
+                <EnvironmentalCharts device={chartDevice} readings={overviewChartReadings} compact />
               </>
             ) : (
               <p className="muted">Add a device to see environmental trends.</p>
@@ -219,7 +299,8 @@ export function CompanyPage() {
               {devices.length === 0 && <p className="muted">No devices yet.</p>}
               <ul className="status-list">
                 {devices.map((device) => {
-                  const status = getDeviceStatus(device, readings, now);
+                  const deviceAlerts = alerts.filter((alert) => alert.deviceId === device.id);
+                  const status = getDeviceStatusFromSnapshot(device, deviceAlerts, now);
                   return (
                     <li key={device.id}>
                       <Link
@@ -274,18 +355,26 @@ export function CompanyPage() {
         <div className="grid two-col">
           <div className="card stack">
             <h2>Devices</h2>
+            {devicesLoading && tabDevices.length === 0 && <p className="muted">Loading…</p>}
             <div className="device-grid">
-              {devices.map((device) => (
+              {tabDevices.map((device) => (
                 <DeviceCard
                   key={device.id}
                   device={device}
                   companyId={companyId}
-                  readings={readings}
+                  alerts={alerts}
                   canManageDevices={canManageDevices}
                   onDelete={() => void handleDeleteDevice(device)}
                 />
               ))}
             </div>
+            <Pagination
+              page={devicesPage}
+              pageSize={PAGE_SIZE}
+              totalCount={devicesTotalCount}
+              loading={devicesLoading}
+              onPageChange={setDevicesPage}
+            />
           </div>
           <div className="stack">
             <form className="card stack" onSubmit={handleCreateDevice}>
@@ -331,7 +420,8 @@ export function CompanyPage() {
               ))}
             </select>
           </div>
-          {filteredReadings.length === 0 && <p className="muted">No readings yet.</p>}
+          {readingsLoading && readings.length === 0 && <p className="muted">Loading…</p>}
+          {!readingsLoading && readings.length === 0 && <p className="muted">No readings yet.</p>}
           <div className="table-wrap">
             <table>
               <thead>
@@ -343,7 +433,7 @@ export function CompanyPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredReadings.map((reading) => (
+                {readings.map((reading) => (
                   <tr key={reading.id}>
                     <td>{deviceName(reading.deviceId)}</td>
                     <td>{reading.temperatureC}°C</td>
@@ -354,6 +444,13 @@ export function CompanyPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={readingsPage}
+            pageSize={PAGE_SIZE}
+            totalCount={readingsTotalCount}
+            loading={readingsLoading}
+            onPageChange={setReadingsPage}
+          />
         </div>
       )}
 
@@ -365,9 +462,10 @@ export function CompanyPage() {
               {showHistory ? 'Show active only' : 'Show history'}
             </button>
           </div>
-          {(showHistory ? alertHistory : alerts).length === 0 && <p className="muted">No alerts to show.</p>}
+          {alertsLoading && tabAlerts.length === 0 && <p className="muted">Loading…</p>}
+          {!alertsLoading && tabAlerts.length === 0 && <p className="muted">No alerts to show.</p>}
           <ul className="alert-list">
-            {(showHistory ? alertHistory : alerts).map((alert) => (
+            {tabAlerts.map((alert) => (
               <li key={alert.id} className={`alert-item ${alert.isActive ? 'alert-item-active' : 'resolved'}`}>
                 <div className="alert-item-row">
                   <div className="alert-item-body">
@@ -388,6 +486,7 @@ export function CompanyPage() {
                     onAcknowledged={() => {
                       pushToast('Alert acknowledged', 'success');
                       void refresh();
+                      setAlertsPage(1);
                     }}
                     onError={(message) => pushToast(message, 'error')}
                   />
@@ -395,6 +494,13 @@ export function CompanyPage() {
               </li>
             ))}
           </ul>
+          <Pagination
+            page={alertsPage}
+            pageSize={PAGE_SIZE}
+            totalCount={alertsTotalCount}
+            loading={alertsLoading}
+            onPageChange={setAlertsPage}
+          />
         </div>
       )}
 
@@ -406,7 +512,7 @@ export function CompanyPage() {
             {members.length === 0 && <p className="muted">No users assigned yet.</p>}
             <ul className="team-list">
               {members.map((member) => {
-                const user = users.find((u) => u.id === member.userId);
+                const user = assignUsers.find((u) => u.id === member.userId);
                 return (
                   <li key={member.id} className="team-row">
                     <div>
@@ -425,7 +531,7 @@ export function CompanyPage() {
               User
               <select value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)} required>
                 <option value="">Select user…</option>
-                {users.map((user) => (
+                {assignUsers.map((user) => (
                   <option key={user.id} value={user.id}>{user.userName} ({user.email})</option>
                 ))}
               </select>
@@ -448,20 +554,20 @@ export function CompanyPage() {
 function DeviceCard({
   device,
   companyId,
-  readings,
+  alerts,
   canManageDevices,
   onDelete,
 }: {
   device: Device;
   companyId: string;
-  readings: Reading[];
+  alerts: Alert[];
   canManageDevices?: boolean;
   onDelete?: () => void;
 }) {
   const now = useMonitoringClock();
-  const deviceReadings = getReadingsForDevice(readings, device.id);
-  const status = getDeviceStatus(device, deviceReadings, now);
-  const lastReadingAt = getDeviceLastReadingAt(device, deviceReadings);
+  const deviceAlerts = alerts.filter((alert) => alert.deviceId === device.id);
+  const status = getDeviceStatusFromSnapshot(device, deviceAlerts, now);
+  const lastReadingAt = status.lastReadingAt;
 
   return (
     <div className={`device-card${deviceCardClass(status.tone)}`}>

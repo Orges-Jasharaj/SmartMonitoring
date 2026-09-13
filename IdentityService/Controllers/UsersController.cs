@@ -19,9 +19,17 @@ namespace IdentityService.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 25,
+            [FromQuery] string? search = null)
         {
-            var response = await _mediator.Send(new GetUsersQuery());
+            var response = await _mediator.Send(new GetUsersQuery
+            {
+                Page = page,
+                PageSize = pageSize,
+                Search = search
+            });
             if (!response.Success)
             {
                 return BadRequest(response);

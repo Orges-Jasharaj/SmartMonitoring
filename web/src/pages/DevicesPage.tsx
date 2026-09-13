@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { Pagination } from '../components/Pagination';
+import { paginateClientList } from '../utils/monitoring';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Device, DeviceCreated } from '../api/types';
@@ -29,8 +31,14 @@ export function DevicesPage() {
   const [createdDevice, setCreatedDevice] = useState<DeviceCreated | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
 
   const selectedCompanyId = deviceForm.companyId || accessibleCompanies[0]?.id || '';
+  const pagedDevices = useMemo(
+    () => paginateClientList(devices, page, pageSize),
+    [devices, page, pageSize],
+  );
 
   function canManageCompany(companyId: string) {
     return canManageCompanyDevices(isAdmin, userId, membersByCompanyId[companyId] ?? []);
@@ -187,11 +195,11 @@ export function DevicesPage() {
       <div className="card stack">
           <div className="panel-header">
             <h2>All devices</h2>
-            <span className="muted small">{devices.length} total</span>
+            <span className="muted small">{pagedDevices.totalCount} total</span>
           </div>
 
-          {loading && devices.length === 0 && <p className="muted">Loading…</p>}
-          {!loading && devices.length === 0 && (
+          {loading && pagedDevices.items.length === 0 && <p className="muted">Loading…</p>}
+          {!loading && pagedDevices.items.length === 0 && (
             <p className="muted">
               {summaries.length === 0
                 ? 'No companies assigned yet.'
@@ -202,7 +210,7 @@ export function DevicesPage() {
           )}
 
           <ul className="status-list">
-            {devices.map(({ device, companyId, companyName, status, lastReadingAt: deviceLastReadingAt }) => {
+            {pagedDevices.items.map(({ device, companyId, companyName, status, lastReadingAt: deviceLastReadingAt }) => {
               const canManage = canManageCompany(companyId);
               return (
                 <li key={device.id}>
@@ -255,6 +263,13 @@ export function DevicesPage() {
               );
             })}
           </ul>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            totalCount={pagedDevices.totalCount}
+            loading={loading}
+            onPageChange={setPage}
+          />
       </div>
     </section>
   );

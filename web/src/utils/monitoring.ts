@@ -1,4 +1,4 @@
-import type { CompanyUser, Device, Reading } from '../api/types';
+import type { Alert, CompanyUser, Device, Reading } from '../api/types';
 
 export const DEVICE_OFFLINE_AFTER_MS = 30 * 60 * 1000;
 
@@ -69,6 +69,67 @@ export function isDeviceOffline(lastReadingAt: Date | null, now = new Date()) {
   }
 
   return now.getTime() - lastReadingAt.getTime() > DEVICE_OFFLINE_AFTER_MS;
+}
+
+export function getDeviceStatusFromSnapshot(device: Device, deviceAlerts: Alert[], now = new Date()): DeviceStatus {
+  const lastReadingAt = parseUtcDateTime(device.lastReadingAtUtc);
+
+  if (!lastReadingAt) {
+    return { label: 'No data', tone: 'muted', lastReadingAt: null };
+  }
+
+  if (isDeviceOffline(lastReadingAt, now)) {
+    return { label: 'Offline', tone: 'warning', lastReadingAt };
+  }
+
+  const activeAlert = deviceAlerts.find((alert) => alert.isActive);
+  if (activeAlert) {
+    return {
+      label: 'Out of range',
+      tone: 'danger',
+      latestTemp: activeAlert.temperatureC ?? undefined,
+      lastReadingAt,
+    };
+  }
+
+  return { label: 'OK', tone: 'ok', lastReadingAt };
+}
+
+export function summarizeDeviceStatusesFromSnapshots(devices: Device[], alerts: Alert[], now = new Date()) {
+  const alertsByDeviceId = alerts.reduce<Map<string, Alert[]>>((acc, alert) => {
+    const key = alert.deviceId.toLowerCase();
+    const current = acc.get(key) ?? [];
+    current.push(alert);
+    acc.set(key, current);
+    return acc;
+  }, new Map());
+
+  return devices.reduce(
+    (acc, device) => {
+      const deviceAlerts = alertsByDeviceId.get(device.id.toLowerCase()) ?? [];
+      const tone = getDeviceStatusFromSnapshot(device, deviceAlerts, now).tone;
+      if (tone === 'ok') {
+        acc.devicesOk += 1;
+      } else if (tone === 'danger') {
+        acc.devicesAlerting += 1;
+      } else if (tone === 'warning') {
+        acc.devicesOffline += 1;
+      }
+      return acc;
+    },
+    { devicesOk: 0, devicesAlerting: 0, devicesOffline: 0 },
+  );
+}
+
+export function paginateClientList<T>(items: T[], page: number, pageSize: number) {
+  const safePage = Math.max(1, page);
+  const start = (safePage - 1) * pageSize;
+  return {
+    items: items.slice(start, start + pageSize),
+    page: safePage,
+    pageSize,
+    totalCount: items.length,
+  };
 }
 
 export function getDeviceStatus(device: Device, readings: Reading[], now = new Date()): DeviceStatus {

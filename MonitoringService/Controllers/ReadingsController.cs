@@ -17,7 +17,8 @@ public class ReadingsController(IMediator mediator) : ControllerBase
         [FromQuery] Guid? deviceId,
         [FromQuery] DateTime? fromUtc,
         [FromQuery] DateTime? toUtc,
-        [FromQuery] int limit = 100)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25)
     {
         var response = await mediator.Send(new GetReadingsQuery
         {
@@ -25,7 +26,8 @@ public class ReadingsController(IMediator mediator) : ControllerBase
             DeviceId = deviceId,
             FromUtc = fromUtc,
             ToUtc = toUtc,
-            Limit = limit
+            Page = page,
+            PageSize = pageSize
         });
 
         if (!response.Success) return BadRequest(response);

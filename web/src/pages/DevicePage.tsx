@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { CompanyUser, Device, Reading } from '../api/types';
 import { EnvironmentalCharts } from '../components/EnvironmentalCharts';
+import { Pagination } from '../components/Pagination';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
@@ -35,7 +36,11 @@ export function DevicePage() {
   const { pushToast } = useToast();
   const now = useMonitoringClock();
   const [device, setDevice] = useState<Device | null>(null);
+  const [chartReadings, setChartReadings] = useState<Reading[]>([]);
   const [readings, setReadings] = useState<Reading[]>([]);
+  const [readingsPage, setReadingsPage] = useState(1);
+  const [readingsTotalCount, setReadingsTotalCount] = useState(0);
+  const readingsPageSize = 25;
   const [members, setMembers] = useState<CompanyUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [deviceKey, setDeviceKey] = useState('');
@@ -69,9 +74,10 @@ export function DevicePage() {
     if (!token || !companyId || !deviceId) return;
     setError(null);
 
-    const [deviceRes, readingsRes] = await Promise.all([
+    const [deviceRes, chartReadingsRes, readingsRes] = await Promise.all([
       api.getDevice(token, deviceId),
-      api.getReadings(token, companyId, deviceId, 100),
+      api.getReadings(token, companyId, { deviceId, page: 1, pageSize: 100 }),
+      api.getReadings(token, companyId, { deviceId, page: readingsPage, pageSize: readingsPageSize }),
     ]);
 
     if (deviceRes.success && deviceRes.data) {
@@ -86,10 +92,16 @@ export function DevicePage() {
       setError(deviceRes.message ?? 'Device not found');
     }
 
-    if (readingsRes.success && readingsRes.data) {
-      setReadings(readingsRes.data);
+    if (chartReadingsRes.success && chartReadingsRes.data) {
+      setChartReadings(chartReadingsRes.data.items);
     }
-  }, [token, companyId, deviceId]);
+
+    if (readingsRes.success && readingsRes.data) {
+      setReadings(readingsRes.data.items);
+      setReadingsTotalCount(readingsRes.data.totalCount);
+      setReadingsPage(readingsRes.data.page);
+    }
+  }, [token, companyId, deviceId, readingsPage, readingsPageSize]);
 
   useEffect(() => {
     void refresh();
@@ -122,14 +134,18 @@ export function DevicePage() {
 
   const handleReading = useCallback(
     (reading: Reading) => {
-      setReadings((current) => prependReading(current, reading));
+      setChartReadings((current) => prependReading(current, reading, 100));
+      if (readingsPage === 1) {
+        setReadings((current) => prependReading(current, reading, readingsPageSize));
+        setReadingsTotalCount((count) => count + 1);
+      }
       setDevice((current) =>
         current && current.id.toLowerCase() === reading.deviceId.toLowerCase()
           ? { ...current, lastReadingAtUtc: reading.measuredAtUtc }
           : current,
       );
     },
-    [],
+    [readingsPage, readingsPageSize],
   );
 
   useMonitoringHub({ companyId, deviceId, onReading: handleReading });
@@ -211,9 +227,9 @@ export function DevicePage() {
     );
   }
 
-  const lastReadingAt = getDeviceLastReadingAt(device, readings);
-  const status = getDeviceStatus(device, readings, now);
-  const latest = getLatestReading(readings, device.id);
+  const lastReadingAt = getDeviceLastReadingAt(device, chartReadings);
+  const status = getDeviceStatus(device, chartReadings, now);
+  const latest = getLatestReading(chartReadings, device.id);
 
   return (
     <section className="stack">
@@ -352,7 +368,7 @@ export function DevicePage() {
       <div className="card stack">
         <h2>Environmental history</h2>
         <p className="muted small">Green bands show each sensor&apos;s configured safe range.</p>
-        <EnvironmentalCharts device={device} readings={readings} />
+        <EnvironmentalCharts device={device} readings={chartReadings} />
       </div>
 
       <div className="card stack">
@@ -386,6 +402,12 @@ export function DevicePage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={readingsPage}
+          pageSize={readingsPageSize}
+          totalCount={readingsTotalCount}
+          onPageChange={setReadingsPage}
+        />
       </div>
     </section>
   );

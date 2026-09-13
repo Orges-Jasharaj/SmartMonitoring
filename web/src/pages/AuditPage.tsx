@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../api/client';
 import type { AuditLog } from '../api/types';
+import { Pagination } from '../components/Pagination';
 import { useAuth } from '../auth/AuthContext';
 import { formatDateTime } from '../utils/monitoring';
 
@@ -55,8 +56,6 @@ export function AuditPage() {
     event.preventDefault();
     void load(1);
   }
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
     <section className="stack">
@@ -131,15 +130,13 @@ export function AuditPage() {
             </tbody>
           </table>
         </div>
-        <div className="pagination">
-          <button type="button" className="btn btn-ghost" disabled={page <= 1} onClick={() => void load(page - 1)}>
-            Previous
-          </button>
-          <span className="muted small">Page {page} of {totalPages}</span>
-          <button type="button" className="btn btn-ghost" disabled={page >= totalPages} onClick={() => void load(page + 1)}>
-            Next
-          </button>
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          loading={loading}
+          onPageChange={(nextPage) => void load(nextPage)}
+        />
       </div>
     </section>
   );

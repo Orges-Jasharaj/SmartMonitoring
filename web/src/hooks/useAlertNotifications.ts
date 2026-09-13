@@ -61,13 +61,13 @@ export function useAlertNotifications(
     const nested = await Promise.all(
       companiesRes.data.map(async (company) => {
         const [alertsRes, devicesRes] = await Promise.all([
-          api.getAlerts(token, company.id, true),
-          api.getDevices(token, company.id),
+          api.getAlerts(token, company.id, { activeOnly: true, page: 1, pageSize: 200 }),
+          api.getDevices(token, company.id, { page: 1, pageSize: 200 }),
         ]);
 
-        const deviceNames = new Map((devicesRes.data ?? []).map((device) => [device.id, device.name]));
+        const deviceNames = new Map((devicesRes.data?.items ?? []).map((device) => [device.id, device.name]));
 
-        return (alertsRes.data ?? []).map((alert) => ({
+        return (alertsRes.data?.items ?? []).map((alert) => ({
           alert,
           companyId: company.id,
           companyName: company.name,

@@ -1,12 +1,15 @@
 using MediatR;
+using SmartMonitoring.Shared.Dtos;
 using SmartMonitoring.Shared.Dtos.Responses;
 
 namespace MonitoringService.Features.Alerts.Queries;
 
-public class GetAlertsQuery : IRequest<ResponseDto<IReadOnlyList<AlertDto>>>
+public class GetAlertsQuery : IRequest<ResponseDto<PagedResult<AlertDto>>>
 {
     public Guid CompanyId { get; set; }
     public bool ActiveOnly { get; set; } = true;
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = Pagination.DefaultPageSize;
 }
 
 public class AlertDto

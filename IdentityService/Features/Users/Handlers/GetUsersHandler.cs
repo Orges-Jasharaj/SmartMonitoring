@@ -4,38 +4,56 @@ using IdentityService.Features.Users.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using SmartMonitoring.Shared.Dtos;
+using SmartMonitoring.Shared.Dtos.Responses;
 
 namespace IdentityService.Features.Users.Handlers;
 
-public class GetUsersHandler : IRequestHandler<GetUsersQuery, SmartMonitoring.Shared.Dtos.Responses.ResponseDto<IEnumerable<UserDto>>>
+public class GetUsersHandler(UserManager<User> userManager, IdentityAppDbContext dbContext)
+    : IRequestHandler<GetUsersQuery, ResponseDto<PagedResult<UserDto>>>
 {
-    private readonly UserManager<User> _userManager;
-    private readonly IdentityAppDbContext _dbContext;
-
-    public GetUsersHandler(UserManager<User> userManager, IdentityAppDbContext dbContext)
-    {
-        _userManager = userManager;
-        _dbContext = dbContext;
-    }
-
-    public async Task<SmartMonitoring.Shared.Dtos.Responses.ResponseDto<IEnumerable<UserDto>>> Handle(
+    public async Task<ResponseDto<PagedResult<UserDto>>> Handle(
         GetUsersQuery request,
         CancellationToken cancellationToken)
     {
-        var users = await _userManager.Users
-            .AsNoTracking()
+        var (page, pageSize) = Pagination.Normalize(request.Page, request.PageSize);
+
+        var query = userManager.Users.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var term = request.Search.Trim();
+            query = query.Where(u =>
+                (u.UserName != null && u.UserName.Contains(term)) ||
+                (u.Email != null && u.Email.Contains(term)) ||
+                u.FirstName.Contains(term) ||
+                u.LastName.Contains(term));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var users = await query
+            .OrderBy(u => u.UserName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         if (users.Count == 0)
         {
-            return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<IEnumerable<UserDto>>.SuccessResponse([]);
+            return ResponseDto<PagedResult<UserDto>>.SuccessResponse(new PagedResult<UserDto>
+            {
+                Items = [],
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            });
         }
 
         var userIds = users.Select(u => u.Id).ToList();
 
         var roleMappings = await (
-            from userRole in _dbContext.UserRoles
-            join role in _dbContext.Roles on userRole.RoleId equals role.Id
+            from userRole in dbContext.UserRoles
+            join role in dbContext.Roles on userRole.RoleId equals role.Id
             where userIds.Contains(userRole.UserId)
             select new { userRole.UserId, RoleName = role.Name })
             .AsNoTracking()
@@ -47,7 +65,7 @@ public class GetUsersHandler : IRequestHandler<GetUsersQuery, SmartMonitoring.Sh
                 g => g.Key,
                 g => g.Select(x => x.RoleName ?? string.Empty).Where(name => name.Length > 0).ToList());
 
-        var list = users.Select(u => new UserDto
+        var items = users.Select(u => new UserDto
         {
             Id = u.Id,
             UserName = u.UserName ?? string.Empty,
@@ -58,6 +76,12 @@ public class GetUsersHandler : IRequestHandler<GetUsersQuery, SmartMonitoring.Sh
             Roles = rolesByUserId.TryGetValue(u.Id, out var roles) ? roles : []
         }).ToList();
 
-        return SmartMonitoring.Shared.Dtos.Responses.ResponseDto<IEnumerable<UserDto>>.SuccessResponse(list);
+        return ResponseDto<PagedResult<UserDto>>.SuccessResponse(new PagedResult<UserDto>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
     }
 }

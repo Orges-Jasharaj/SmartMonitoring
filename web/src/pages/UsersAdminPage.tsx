@@ -1,29 +1,43 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../api/client';
 import type { User } from '../api/types';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
+
+const PAGE_SIZE = 25;
 
 export function UsersAdminPage() {
   const { token, isAdmin } = useAuth();
   const { pushToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
+  const [assignUsers, setAssignUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [search, setSearch] = useState('');
   const [assignUserId, setAssignUserId] = useState('');
   const [assignRole, setAssignRole] = useState('');
 
-  async function load() {
+  async function load(nextPage = page, nextSearch = search) {
     if (!token) return;
     setLoading(true);
-    const [usersRes, rolesRes] = await Promise.all([api.getUsers(token), api.getRoles(token)]);
-    setUsers(usersRes.data ?? []);
+    const [usersRes, rolesRes, assignUsersRes] = await Promise.all([
+      api.getUsers(token, { page: nextPage, pageSize: PAGE_SIZE, search: nextSearch || undefined }),
+      api.getRoles(token),
+      api.getUsers(token, { page: 1, pageSize: 200 }),
+    ]);
+    setUsers(usersRes.data?.items ?? []);
+    setTotalCount(usersRes.data?.totalCount ?? 0);
+    setPage(usersRes.data?.page ?? nextPage);
+    setAssignUsers(assignUsersRes.data?.items ?? []);
     setRoles(rolesRes.data ?? []);
     setLoading(false);
   }
 
   useEffect(() => {
-    void load();
+    void load(1, search);
   }, [token]);
 
   async function toggleActive(user: User) {
@@ -38,7 +52,7 @@ export function UsersAdminPage() {
     }
 
     pushToast(`User ${user.userName} ${user.isActive ? 'deactivated' : 'activated'}`, 'success');
-    await load();
+    await load(page, search);
   }
 
   async function handleAssignRole(event: FormEvent) {
@@ -54,7 +68,12 @@ export function UsersAdminPage() {
     pushToast('Role assigned', 'success');
     setAssignUserId('');
     setAssignRole('');
-    await load();
+    await load(page, search);
+  }
+
+  function handleSearchSubmit(event: FormEvent) {
+    event.preventDefault();
+    void load(1, search);
   }
 
   if (!isAdmin) {
@@ -68,7 +87,7 @@ export function UsersAdminPage() {
           <h1>Users</h1>
           <p className="muted">Manage identity users, activation, and system roles.</p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={() => void load()}>Refresh</button>
+        <button type="button" className="btn btn-ghost" onClick={() => void load(page, search)}>Refresh</button>
       </div>
 
       <form className="card stack" onSubmit={handleAssignRole}>
@@ -78,7 +97,7 @@ export function UsersAdminPage() {
             User
             <select value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)} required>
               <option value="">Select user…</option>
-              {users.map((user) => (
+              {assignUsers.map((user) => (
                 <option key={user.id} value={user.id}>{user.userName}</option>
               ))}
             </select>
@@ -97,7 +116,17 @@ export function UsersAdminPage() {
       </form>
 
       <div className="card stack">
-        <h2>All users</h2>
+        <div className="panel-header">
+          <h2>All users</h2>
+          <form className="inline-fields" onSubmit={handleSearchSubmit}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search username or email…"
+            />
+            <button type="submit" className="btn btn-secondary">Search</button>
+          </form>
+        </div>
         {loading && <p className="muted">Loading…</p>}
         <div className="table-wrap">
           <table>
@@ -131,6 +160,13 @@ export function UsersAdminPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={totalCount}
+          loading={loading}
+          onPageChange={(nextPage) => void load(nextPage, search)}
+        />
       </div>
     </section>
   );

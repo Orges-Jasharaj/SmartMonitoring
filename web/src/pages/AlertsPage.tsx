@@ -1,23 +1,84 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { api } from '../api/client';
+import type { Alert } from '../api/types';
 import { StatCard } from '../components/StatCard';
 import { AlertAcknowledgeButton } from '../components/AlertAcknowledgeButton';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
-import { useGlobalMonitoring } from '../hooks/useGlobalMonitoring';
-import { formatDateTime } from '../utils/monitoring';
+import { useGlobalMonitoring, type GlobalAlert } from '../hooks/useGlobalMonitoring';
+import { formatDateTime, paginateClientList } from '../utils/monitoring';
+
+const PAGE_SIZE = 25;
 
 export function AlertsPage() {
   const { token } = useAuth();
   const { pushToast } = useToast();
-  const { alerts, alertHistory, loading, error, refresh, totals } = useGlobalMonitoring(token);
+  const { alerts: activeAlerts, loading: monitoringLoading, error, refresh: refreshMonitoring, totals } =
+    useGlobalMonitoring(token);
   const [showHistory, setShowHistory] = useState(false);
+  const [page, setPage] = useState(1);
+  const [historyAlerts, setHistoryAlerts] = useState<GlobalAlert[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
-  const visibleAlerts = showHistory ? alertHistory : alerts;
+  const loadHistory = useCallback(async () => {
+    if (!token) return;
+    setHistoryLoading(true);
+
+    const companiesRes = await api.getCompanies(token);
+    if (!companiesRes.success || !companiesRes.data) {
+      setHistoryAlerts([]);
+      setHistoryLoading(false);
+      return;
+    }
+
+    const nested = await Promise.all(
+      companiesRes.data.map(async (company) => {
+        const [alertsRes, devicesRes] = await Promise.all([
+          api.getAlerts(token, company.id, { activeOnly: false, page: 1, pageSize: 200 }),
+          api.getDevices(token, company.id, { page: 1, pageSize: 200 }),
+        ]);
+        const deviceNames = new Map((devicesRes.data?.items ?? []).map((device) => [device.id, device.name]));
+        return (alertsRes.data?.items ?? []).map((alert: Alert) => ({
+          alert,
+          companyId: company.id,
+          companyName: company.name,
+          deviceName: deviceNames.get(alert.deviceId) ?? alert.deviceId.slice(0, 8),
+        }));
+      }),
+    );
+
+    setHistoryAlerts(
+      nested
+        .flat()
+        .sort(
+          (a, b) =>
+            new Date(b.alert.triggeredAtUtc).getTime() - new Date(a.alert.triggeredAtUtc).getTime(),
+        ),
+    );
+    setHistoryLoading(false);
+  }, [token]);
+
+  useEffect(() => {
+    if (!showHistory) return;
+    void loadHistory();
+  }, [showHistory, loadHistory]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [showHistory]);
+
+  const sourceAlerts = showHistory ? historyAlerts : activeAlerts;
+  const pagedAlerts = paginateClientList(sourceAlerts, page, PAGE_SIZE);
+  const loading = showHistory ? historyLoading : monitoringLoading;
 
   async function handleAcknowledged() {
     pushToast('Alert acknowledged', 'success');
-    void refresh();
+    void refreshMonitoring();
+    if (showHistory) {
+      void loadHistory();
+    }
   }
 
   function handleAcknowledgeError(message: string) {
@@ -35,7 +96,14 @@ export function AlertsPage() {
               : 'Active temperature alerts across all your companies.'}
           </p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={() => void refresh()}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            void refreshMonitoring();
+            if (showHistory) void loadHistory();
+          }}
+        >
           Refresh
         </button>
       </div>
@@ -52,22 +120,22 @@ export function AlertsPage() {
         <div className="panel-header">
           <h2>{showHistory ? 'Alert history' : 'Active alerts'}</h2>
           <div className="panel-header-actions">
-            <span className="muted small">{visibleAlerts.length} total</span>
+            <span className="muted small">{pagedAlerts.totalCount} total</span>
             <button type="button" className="btn btn-ghost" onClick={() => setShowHistory((value) => !value)}>
               {showHistory ? 'Show active only' : 'Show history'}
             </button>
           </div>
         </div>
 
-        {loading && visibleAlerts.length === 0 && <p className="muted">Loading…</p>}
-        {!loading && visibleAlerts.length === 0 && (
+        {loading && pagedAlerts.items.length === 0 && <p className="muted">Loading…</p>}
+        {!loading && pagedAlerts.items.length === 0 && (
           <p className="muted">
             {showHistory ? 'No alert history yet.' : 'No active alerts. All monitored devices are within range.'}
           </p>
         )}
 
         <ul className="alert-list">
-          {visibleAlerts.map(({ alert, companyId, companyName, deviceName }) => (
+          {pagedAlerts.items.map(({ alert, companyId, companyName, deviceName }) => (
             <li key={alert.id} className={`alert-item${alert.isActive ? ' alert-item-active' : ' resolved'}`}>
               <div className="alert-item-row">
                 <Link to={`/companies/${companyId}?tab=alerts`} className="dashboard-link-block alert-item-body">
@@ -95,6 +163,13 @@ export function AlertsPage() {
             </li>
           ))}
         </ul>
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={pagedAlerts.totalCount}
+          loading={loading}
+          onPageChange={setPage}
+        />
       </div>
     </section>
   );

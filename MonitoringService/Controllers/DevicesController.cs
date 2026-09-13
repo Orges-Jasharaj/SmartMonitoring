@@ -37,9 +37,19 @@ public class DevicesController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetByCompany(Guid companyId)
+    public async Task<IActionResult> GetByCompany(
+        Guid companyId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null)
     {
-        var response = await mediator.Send(new GetDevicesByCompanyQuery { CompanyId = companyId });
+        var response = await mediator.Send(new GetDevicesByCompanyQuery
+        {
+            CompanyId = companyId,
+            Page = page,
+            PageSize = pageSize,
+            Search = search
+        });
         if (!response.Success) return BadRequest(response);
         return Ok(response);
     }
