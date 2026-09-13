@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SmartMonitoring.Shared.Messaging;
 
 namespace SmartMonitoring.Shared.Audit;
 
@@ -19,16 +20,25 @@ public static class AuditServiceExtensions
         });
 
         services.AddHttpContextAccessor();
-        services.AddHttpClient<IAuditPublisher, HttpAuditPublisher>((serviceProvider, client) =>
-        {
-            var options = serviceProvider.GetRequiredService<IOptions<AuditOptions>>().Value;
-            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
 
-            if (!string.IsNullOrWhiteSpace(options.ApiKey))
+        if (KafkaServiceCollectionExtensions.UseKafkaTransport(configuration, AuditOptions.SectionName))
+        {
+            services.AddKafkaProducer(configuration);
+            services.AddSingleton<IAuditPublisher, KafkaAuditPublisher>();
+        }
+        else
+        {
+            services.AddHttpClient<IAuditPublisher, HttpAuditPublisher>((serviceProvider, client) =>
             {
-                client.DefaultRequestHeaders.Add("X-Audit-Api-Key", options.ApiKey);
-            }
-        });
+                var options = serviceProvider.GetRequiredService<IOptions<AuditOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+
+                if (!string.IsNullOrWhiteSpace(options.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("X-Audit-Api-Key", options.ApiKey);
+                }
+            });
+        }
 
         services.AddScoped<IAuditRecorder, AuditRecorder>();
 

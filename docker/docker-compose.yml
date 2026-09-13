@@ -27,8 +27,11 @@ services:
       Observability__LokiUrl: http://loki:3100
       Observability__OtlpEndpoint: http://tempo:4317
       Observability__RestrictMetricsToLocalhost: "false"
+      Kafka__Enabled: "true"
+      Kafka__BootstrapServers: kafka:9092
       Audit__Enabled: "true"
       Audit__ServiceName: IdentityService
+      Audit__Transport: Kafka
       Audit__BaseUrl: http://audit-logging:8081
       Audit__ApiKey: dev-audit-api-key-change-in-production
       AdminUser__Password: "Admin@123456"
@@ -44,7 +47,7 @@ services:
       - sqlserver
       - loki
       - tempo
-      - audit-logging
+      - kafka
       - mailpit
 
   mailpit:
@@ -52,6 +55,35 @@ services:
     ports:
       - "8025:8025"
       - "1025:1025"
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8089:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: smartmonitoring
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
 
   api-gateway:
     build:
@@ -96,11 +128,15 @@ services:
       Observability__LokiUrl: http://loki:3100
       Observability__OtlpEndpoint: http://tempo:4317
       Observability__RestrictMetricsToLocalhost: "false"
+      Kafka__Enabled: "true"
+      Kafka__BootstrapServers: kafka:9092
       Audit__Enabled: "true"
       Audit__ServiceName: MonitoringService
+      Audit__Transport: Kafka
       Audit__BaseUrl: http://audit-logging:8081
       Audit__ApiKey: dev-audit-api-key-change-in-production
       Notification__Enabled: "true"
+      Notification__Transport: Kafka
       Notification__BaseUrl: http://notification-service:8083
       Notification__ApiKey: dev-notification-api-key-change-in-production
       Alert__ActiveAlertReminderMinutes: "1"
@@ -116,8 +152,7 @@ services:
       - sqlserver
       - loki
       - tempo
-      - audit-logging
-      - notification-service
+      - kafka
       - identity-service
 
   notification-service:
@@ -140,10 +175,13 @@ services:
       Email__UseSsl: "false"
       Email__FromAddress: alerts@smartmonitoring.local
       Email__FromName: SmartMonitoring Alerts
+      Kafka__Enabled: "true"
+      Kafka__BootstrapServers: kafka:9092
     depends_on:
       - mailpit
       - loki
       - tempo
+      - kafka
 
   audit-logging:
     build:
@@ -167,10 +205,13 @@ services:
       Jwt__Key: "DockerDevJwtKey-MustBeAtLeast32CharactersLong!"
       Jwt__Issuer: SmartMonitoring.Identity
       Jwt__Audience: SmartMonitoring.Clients
+      Kafka__Enabled: "true"
+      Kafka__BootstrapServers: kafka:9092
     depends_on:
       - sqlserver
       - loki
       - tempo
+      - kafka
 
   loki:
     image: grafana/loki:3.0.0

@@ -1,7 +1,9 @@
 using NotificationService.Middleware;
+using NotificationService.Services;
 using NotificationService.Services.Email;
 using MediatR;
 using Serilog;
+using SmartMonitoring.Shared.Messaging;
 using SmartMonitoring.Shared.Observability;
 
 Log.Logger = new LoggerConfiguration()
@@ -24,6 +26,12 @@ try
     builder.Services.AddMediatRObservability();
 
     builder.Services.AddHealthChecks();
+
+    builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection(KafkaOptions.SectionName));
+    if (builder.Configuration.GetValue<bool>($"{KafkaOptions.SectionName}:Enabled"))
+    {
+        builder.Services.AddHostedService<KafkaAlertNotificationConsumerService>();
+    }
 
     var app = builder.Build();
 

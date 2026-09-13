@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using SmartMonitoring.Shared.Messaging;
 using SmartMonitoring.Shared.Observability;
 using System.Text;
 
@@ -55,6 +56,12 @@ try
     builder.Services.Configure<AuditRetentionOptions>(builder.Configuration.GetSection(AuditRetentionOptions.SectionName));
     builder.Services.AddScoped<IAuditRetentionService, AuditRetentionService>();
     builder.Services.AddHostedService<AuditRetentionCleanupService>();
+
+    builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection(KafkaOptions.SectionName));
+    if (builder.Configuration.GetValue<bool>($"{KafkaOptions.SectionName}:Enabled"))
+    {
+        builder.Services.AddHostedService<KafkaAuditConsumerService>();
+    }
 
     builder.Services.AddDbContext<AuditDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));

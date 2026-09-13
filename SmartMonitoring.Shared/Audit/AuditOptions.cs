@@ -11,4 +11,7 @@ public class AuditOptions
     public string BaseUrl { get; set; } = "http://localhost:8081";
 
     public string? ApiKey { get; set; }
+
+    /// <summary>Http (direct POST) or Kafka (publish to topic).</summary>
+    public string Transport { get; set; } = "Http";
 }
